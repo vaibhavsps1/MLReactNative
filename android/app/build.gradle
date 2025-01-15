@@ -105,12 +105,20 @@ android {
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }
     }
+     configurations.all {
+        resolutionStrategy {
+            // Force a specific version of FFmpeg
+            force 'com.arthenica:ffmpeg-kit-https:6.0-2'
+            // Exclude the conflicting package
+            exclude group: 'com.arthenica', module: 'ffmpeg-kit-min'
+        }
+    }
 }
 
 dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
-
+implementation 'com.arthenica:ffmpeg-kit-https:6.0-2'
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")
     } else {
