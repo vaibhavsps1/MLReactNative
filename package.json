@@ -10,18 +10,27 @@
     "test": "jest"
   },
   "dependencies": {
+    "@react-native-community/slider": "^4.5.5",
     "@react-navigation/native": "^7.0.14",
     "@react-navigation/native-stack": "^7.2.0",
+    "@reduxjs/toolkit": "^2.5.0",
+    "@types/react-native-vector-icons": "^6.4.18",
     "ffmpeg-kit-react-native": "^6.0.2",
     "react": "18.3.1",
     "react-native": "0.76.5",
+    "react-native-awesome-slider": "^2.9.0",
+    "react-native-fast-image": "^8.6.3",
     "react-native-fs": "^2.20.0",
+    "react-native-gesture-handler": "^2.22.0",
     "react-native-image-picker": "^7.2.3",
     "react-native-permissions": "^3.8.0",
+    "react-native-reanimated": "^3.16.7",
     "react-native-safe-area-context": "^5.1.0",
     "react-native-screens": "^4.5.0",
+    "react-native-vector-icons": "^10.0.0",
     "react-native-video": "^6.9.1",
     "react-native-video-trim": "^2.2.11",
+    "react-redux": "^9.2.0",
     "rn-range-slider": "^2.2.2"
   },
   "devDependencies": {

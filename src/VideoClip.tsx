@@ -1,894 +1,3 @@
-// // VideoClip.tsx
-// import * as React from 'react';
-// import {
-//   StyleSheet,
-//   View,
-//   Text,
-//   TouchableOpacity,
-//   Dimensions,
-//   ScrollView,
-//   Image,
-//   ActivityIndicator,
-//   Animated,
-//   PanResponder,
-//   Alert,
-// } from 'react-native';
-// import {
-//   launchImageLibrary,
-//   type ImagePickerResponse,
-// } from 'react-native-image-picker';
-// import Video from 'react-native-video';
-// import {useEffect, useState, useRef} from 'react';
-// import {VideoUtils} from './services/VideoUtils';
-// import RNFS from 'react-native-fs';
-// import {FFmpegKit} from 'ffmpeg-kit-react-native';
-
-// const {width: SCREEN_WIDTH} = Dimensions.get('window');
-// const FRAME_BAR_HEIGHT = 80;
-// const TIMELINE_CENTER = SCREEN_WIDTH / 2;
-// const FRAME_STATUS = {
-//   READY: {name: {description: 'ready'}},
-// };
-
-// interface Frame {
-//   uri: string;
-//   status: string;
-//   timestamp?: number;
-// }
-
-// interface TimeRange {
-//   start: number;
-//   end: number;
-// }
-
-// // Add these constants at the top
-// const FRAME_WIDTH = VideoUtils.FRAME_WIDTH + 2; // Including margin
-// const TIME_BAR_HEIGHT = 20;
-
-// export default function VideoClip() {
-//   const [videoUri, setVideoUri] = useState<string | null>(null);
-//   const [isPlaying, setIsPlaying] = useState(false);
-//   const [currentTime, setCurrentTime] = useState(0);
-//   const [duration, setDuration] = useState(0);
-//   const [frames, setFrames] = useState<Frame[]>([]);
-//   const [isGeneratingFrames, setIsGeneratingFrames] = useState(false);
-//   const [isSplitting, setIsSplitting] = useState(false);
-//   const leftHandlePosition = useRef(new Animated.Value(0)).current;
-//   const rightHandlePosition = useRef(new Animated.Value(0)).current;
-
-//   const videoRef = useRef<Video>(null);
-//   const scrollViewRef = useRef<ScrollView>(null);
-//   const scrollOffset = useRef(0);
-
-//   useEffect(() => {
-//     return () => {
-//       // Cleanup frames on unmount
-//       VideoUtils.cleanFrames().then(() => {
-//         VideoUtils.verifyFramesCleanup().then(cleaned => {
-//           if (!cleaned) {
-//             console.warn('Some frames might not have been cleaned up properly');
-//           }
-//         });
-//       });
-//     };
-//   }, []);
-
-//   const TimeBar = ({duration, currentTime, width}) => {
-//     const progress = (currentTime / duration) * 100;
-
-//     return (
-//       <View style={[styles.timeBar, {width}]}>
-//         <View style={[styles.timeBarProgress, {width: `${progress}%`}]} />
-//         <Text style={styles.timeText}>
-//           {`${Math.floor(currentTime / 60)}:${String(
-//             Math.floor(currentTime % 60),
-//           ).padStart(2, '0')} / ${Math.floor(duration / 60)}:${String(
-//             Math.floor(duration % 60),
-//           ).padStart(2, '0')}`}
-//         </Text>
-//       </View>
-//     );
-//   };
-
-//   const generateFrames = async (uri: string, videoDuration: number) => {
-//     const numberOfFrames = Math.ceil(videoDuration * VideoUtils.FRAME_PER_SEC);
-//     const timestamp = new Date().getTime(); // Add timestamp
-//     setIsGeneratingFrames(true);
-
-//     try {
-//       await VideoUtils.getFrames(
-//         `frame_${timestamp}`, // Add timestamp to filename
-//         uri,
-//         numberOfFrames,
-//         (outputPath: string) => {
-//           const _framesURI = [];
-//           for (let i = 0; i < numberOfFrames; i++) {
-//             _framesURI.push(
-//               `${outputPath.replace('%4d', String(i + 1).padStart(4, '0'))}`,
-//             );
-//           }
-//           const _frames = _framesURI.map(_frameURI => ({
-//             uri: _frameURI,
-//             status: FRAME_STATUS.READY.name.description,
-//             timestamp: timestamp, // Add timestamp to frame data
-//           }));
-//           setFrames(_frames);
-//           setIsGeneratingFrames(false);
-//         },
-//         () => {
-//           console.error('Failed to generate frames');
-//           setIsGeneratingFrames(false);
-//         },
-//         (frameUri, processedFrames, totalFrames) => {
-//           console.log(`Generated frame ${processedFrames}/${totalFrames}`);
-//         },
-//       );
-//     } catch (error) {
-//       console.error('Error generating frames:', error);
-//       setIsGeneratingFrames(false);
-//     }
-//   };
-
-//   const onMediaLoaded = async (response: ImagePickerResponse) => {
-//     if (response.assets?.[0]?.uri) {
-//       await VideoUtils.cleanFrames();
-//       setFrames([]);
-//       setIsGeneratingFrames(false);
-//       setVideoUri(response.assets[0].uri);
-//     }
-//   };
-
-//   const onVideoLoad = (data: any) => {
-//     setDuration(data.duration);
-//     if (videoUri) {
-//       generateFrames(videoUri, data.duration);
-//       if (scrollViewRef.current) {
-//         scrollViewRef.current.scrollTo({
-//           x: 0,
-//           animated: false,
-//         });
-//       }
-//     }
-//   };
-
-//   const onProgress = (data: any) => {
-//     setCurrentTime(data.currentTime);
-
-//     if (scrollViewRef.current && frames.length > 0) {
-//       const totalContentWidth = frames.length * FRAME_WIDTH;
-//       const maxScroll = totalContentWidth - SCREEN_WIDTH + 2 * TIMELINE_CENTER;
-//       const scrollProgress = (data.currentTime / duration) * maxScroll;
-
-//       requestAnimationFrame(() => {
-//         scrollViewRef.current?.scrollTo({
-//           x: scrollProgress,
-//           animated: false,
-//         });
-//       });
-//     }
-//   };
-
-//   const onFramePress = (frameIndex: number) => {
-//     const seekTime = (frameIndex / frames.length) * duration;
-//     if (videoRef.current) {
-//       videoRef.current.seek(seekTime);
-//     }
-//   };
-
-//   const togglePlayPause = () => {
-//     setIsPlaying(!isPlaying);
-//   };
-
-//   const resetVideoState = async () => {
-//     setIsPlaying(false);
-//     await VideoUtils.cleanFrames();
-//     setFrames([]);
-//     setVideoUri(null);
-//     setCurrentTime(0);
-//     setDuration(0);
-//     setIsGeneratingFrames(false);
-//   };
-//   const createPanResponder = (isLeft: boolean) => {
-//     const handlePosition = isLeft ? leftHandlePosition : rightHandlePosition;
-
-//     return PanResponder.create({
-//       onStartShouldSetPanResponder: () => true,
-//       onMoveShouldSetPanResponder: () => true,
-
-//       onPanResponderGrant: () => {
-//         handlePosition.setOffset(handlePosition.__getValue());
-//         handlePosition.setValue(0);
-//       },
-
-//       onPanResponderMove: (_, gesture) => {
-//         const currentScrollOffset = scrollOffset.current || 0;
-//         const totalWidth = frames.length * FRAME_WIDTH;
-//         const handleX = gesture.moveX;
-
-//         const rawPosition = gesture.moveX + currentScrollOffset;
-//         const minPosition = isLeft ? TIMELINE_CENTER : leftHandlePosition.__getValue() + FRAME_WIDTH;
-//         const maxPosition = isLeft
-//           ? rightHandlePosition.__getValue() - FRAME_WIDTH
-//           : totalWidth;
-
-//         const newPosition = Math.max(minPosition, Math.min(maxPosition, rawPosition));
-//         if (!isLeft && scrollViewRef.current) { // Only for right handle
-//           if (handleX > SCREEN_WIDTH - 100) { // Near right edge of viewport
-//             const maxScroll = totalWidth - SCREEN_WIDTH + (2 * TIMELINE_CENTER);
-//             const newOffset = Math.min(maxScroll, currentScrollOffset + 20);
-//             scrollViewRef.current.scrollTo({
-//               x: newOffset,
-//               animated: false
-//             });
-//           }
-//         }
-//         handlePosition.setValue(newPosition - handlePosition._offset);
-//         if (isLeft && videoRef.current) {
-//           const adjustedPosition = newPosition - TIMELINE_CENTER;
-//           const time = (adjustedPosition / totalWidth) * duration;
-//           videoRef.current.seek(Math.max(0, Math.min(duration, time)));
-//         }
-//       },
-//       onPanResponderRelease: () => {
-//         handlePosition.flattenOffset();
-//       }
-//     });
-//   };
-//   const leftPanResponder = useRef(createPanResponder(true)).current;
-//   const rightPanResponder = useRef(createPanResponder(false)).current;
-
-//   const handleSplitPress = async () => {
-//     if (!isSplitting) {
-//       setIsPlaying(false);
-//       setIsSplitting(true);
-
-//       leftHandlePosition.setValue(TIMELINE_CENTER);
-//       rightHandlePosition.setValue(TIMELINE_CENTER + (FRAME_WIDTH * 3));
-
-//       if (scrollViewRef.current) {
-//         scrollViewRef.current.scrollTo({
-//           x: 0,
-//           animated: true
-//         });
-//       }
-//     } else {
-//       const totalWidth = frames.length * FRAME_WIDTH;
-//       const leftPos = Math.max(
-//         0,
-//         leftHandlePosition.__getValue() - TIMELINE_CENTER,
-//       );
-//       const rightPos = rightHandlePosition.__getValue() - TIMELINE_CENTER;
-
-//       const startTime = (leftPos / totalWidth) * duration;
-//       const endTime = (rightPos / totalWidth) * duration;
-//       const clipDuration = endTime - startTime;
-
-//       Alert.alert(
-//         'Save Split Section',
-//         'Do you want to save this section of the video?',
-//         [
-//           {
-//             text: 'Cancel',
-//             style: 'cancel',
-//             onPress: () => {
-//               setIsSplitting(false);c
-//             },
-//           },
-//           {
-//             text: 'Save',
-// onPress: async () => {
-//   try {
-//     const outputPath = `${
-//       RNFS.DownloadDirectoryPath
-//     }/split_${Date.now()}.mp4`;
-//     const command = `-i "${videoUri}" -ss ${startTime.toFixed(
-//       3,
-//     )} -t ${clipDuration.toFixed(
-//       3,
-//     )} -c:v copy -c:a copy "${outputPath}"`;
-
-//     const result = await FFmpegKit.execute(command);
-//     const returnCode = await result.getReturnCode();
-
-//     if (returnCode.isValueSuccess()) {
-//       Alert.alert('Success', 'Video section saved successfully!');
-//     } else {
-//       const output = await result.getOutput();
-//       console.error('FFmpeg error output:', output);
-//       Alert.alert(
-//         'Error',
-//         'Failed to save video section. Please try again.',
-//       );
-//     }
-//   } catch (error) {
-//     console.error('Split failed:', error);
-//     Alert.alert('Error', 'Failed to save video section');
-//   }
-//   setIsSplitting(false);
-// },
-//           },
-//         ],
-//       );
-//     }
-//   };
-
-//   return (
-//     <View style={styles.container}>
-//       {videoUri && (
-//         <View style={styles.videoContainer}>
-//           <TouchableOpacity
-//             style={styles.crossButton}
-//             onPress={resetVideoState}>
-//             <Text>❌</Text>
-//           </TouchableOpacity>
-//           <Video
-//             ref={videoRef}
-//             source={{uri: videoUri}}
-//             style={styles.video}
-//             resizeMode="contain"
-//             paused={!isPlaying}
-//             onLoad={onVideoLoad}
-//             onProgress={onProgress}
-//             repeat={true}
-//           />
-//           <TouchableOpacity style={styles.playButton} onPress={togglePlayPause}>
-//             <Text style={styles.playButtonText}>{isPlaying ? '⏸️' : '▶️'}</Text>
-//           </TouchableOpacity>
-//           <View style={styles.frameBarSection}>
-//             <TimeBar
-//               duration={duration}
-//               currentTime={currentTime}
-//               width={SCREEN_WIDTH}
-//             />
-//             <View style={styles.frameBarContainer}>
-//               <View style={styles.centerIndicator} />
-//               <ScrollView
-//                 ref={scrollViewRef}
-//                 horizontal
-//                 showsHorizontalScrollIndicator={false}
-//                 contentContainerStyle={styles.frameBarContent}
-//                 onScroll={event => {
-//                   scrollOffset.current = event.nativeEvent.contentOffset.x;
-//                 }}
-//                 scrollEventThrottle={16}
-//                 removeClippedSubviews={true}
-//                 // scrollEnabled={!isSplitting}
-//                 scrollEnabled={true}>
-//                 <View style={{width: TIMELINE_CENTER}} />
-//                 {isGeneratingFrames ? (
-//                   <View style={styles.loadingContainer}>
-//                     <ActivityIndicator color="#007AFF" />
-//                     <Text style={styles.loadingText}>Generating frames...</Text>
-//                   </View>
-//                 ) : (
-//                   frames.map((frame, index) => (
-//                     <TouchableOpacity
-//                       key={`frame-${index}`}
-//                       onPress={() => onFramePress(index)}
-//                       style={styles.frameItem}>
-//                       <Image
-//                         key={`frame-image-${frame.uri}-${index}`}
-//                         source={{
-//                           uri: `file:///${frame.uri}`,
-//                           cache: 'reload',
-//                         }}
-//                         style={styles.frameImage}
-//                         resizeMode="cover"
-//                       />
-//                     </TouchableOpacity>
-//                   ))
-//                 )}
-//                 <View style={{width: TIMELINE_CENTER}} />
-//                 {isSplitting && (
-//                   <>
-//                     <Animated.View
-//                       {...leftPanResponder.panHandlers}
-//                       style={[
-//                         styles.handleBar,
-//                         styles.leftHandle,
-//                         {
-//                           transform: [{translateX: leftHandlePosition}],
-//                         },
-//                       ]}
-//                     />
-//                     <Animated.View
-//                       {...rightPanResponder.panHandlers}
-//                       style={[
-//                         styles.handleBar,
-//                         styles.rightHandle,
-//                         {
-//                           transform: [{translateX: rightHandlePosition}],
-//                         },
-//                       ]}
-//                     />
-//                     <Animated.View
-//                       style={[
-//                         styles.selectionOverlay,
-//                         {
-//                           left: leftHandlePosition,
-//                           width: Animated.subtract(
-//                             rightHandlePosition,
-//                             leftHandlePosition,
-//                           ),
-//                         },
-//                       ]}
-//                     />
-//                   </>
-//                 )}
-//               </ScrollView>
-//             </View>
-//           </View>
-//           <View style={styles.toolsContainer}>
-//             <TouchableOpacity style={styles.tool} onPress={handleSplitPress}>
-//               <Text style={styles.toolText}>Split</Text>
-//             </TouchableOpacity>
-//             <TouchableOpacity style={styles.tool}>
-//               <Text style={styles.toolText}>Trim</Text>
-//             </TouchableOpacity>
-//             <TouchableOpacity style={styles.tool}>
-//               <Text style={styles.toolText}>Delete</Text>
-//             </TouchableOpacity>
-//           </View>
-//         </View>
-//       )}
-//       {(!videoUri || (videoUri && frames.length === 0)) && (
-//         <TouchableOpacity
-//           onPress={() => {
-//             launchImageLibrary(
-//               {
-//                 mediaType: 'video',
-//                 includeExtra: true,
-//                 assetRepresentationMode: 'current',
-//               },
-//               onMediaLoaded,
-//             );
-//           }}
-//           style={[
-//             styles.selectButton,
-//             videoUri && styles.selectButtonWithVideo,
-//           ]}>
-//           <Text style={styles.buttonText}>Select Video</Text>
-//         </TouchableOpacity>
-//       )}
-//     </View>
-//   );
-// }
-
-// const styles = StyleSheet.create({
-//   container: {
-//     flex: 1,
-//     backgroundColor: '#000',
-//   },
-//   videoContainer: {
-//     flex: 1,
-//     justifyContent: 'center',
-//     alignItems: 'center',
-//   },
-//   video: {
-//     width: '90%',
-//     height: '60%',
-//     position: 'absolute',
-//     top: '10%',
-//   },
-//   playButton: {
-//     position: 'absolute',
-//     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-//     width: 60,
-//     height: 60,
-//     borderRadius: 30,
-//     justifyContent: 'center',
-//     alignItems: 'center',
-//     bottom: 200,
-//   },
-//   playButtonText: {
-//     color: 'white',
-//     fontSize: 24,
-//   },
-//   centerIndicator: {
-//     position: 'absolute',
-//     left: '50%',
-//     width: 2,
-//     height: FRAME_BAR_HEIGHT,
-//     backgroundColor: '#007AFF',
-//     zIndex: 10,
-//   },
-//   frameBarContent: {
-//     height: FRAME_BAR_HEIGHT,
-//     alignItems: 'center',
-//   },
-//   frameImage: {
-//     width: '100%',
-//     height: '100%',
-//   },
-//   loadingContainer: {
-//     flexDirection: 'row',
-//     alignItems: 'center',
-//     paddingHorizontal: 20,
-//   },
-//   loadingText: {
-//     color: 'white',
-//     marginLeft: 10,
-//   },
-//   toolsContainer: {
-//     position: 'absolute',
-//     bottom: 0,
-//     flexDirection: 'row',
-//     width: '100%',
-//     height: 80,
-//     backgroundColor: '#222',
-//     justifyContent: 'space-around',
-//     alignItems: 'center',
-//   },
-//   tool: {
-//     padding: 10,
-//   },
-//   toolText: {
-//     color: 'white',
-//     fontSize: 16,
-//   },
-//   selectButton: {
-//     position: 'absolute',
-//     bottom: 20,
-//     alignSelf: 'center',
-//     backgroundColor: '#007AFF',
-//     padding: 15,
-//     borderRadius: 8,
-//   },
-//   selectButtonWithVideo: {
-//     bottom: 100,
-//   },
-//   buttonText: {
-//     color: 'white',
-//     fontSize: 16,
-//   },
-//   crossButton: {
-//     position: 'absolute',
-//     top: 20,
-//     left: 20,
-//     zIndex: 10,
-//     width: 40,
-//     height: 40,
-//     borderRadius: 20,
-//     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-//     justifyContent: 'center',
-//     alignItems: 'center',
-//   },
-//   frameBarSection: {
-//     position: 'absolute',
-//     bottom: 80,
-//     width: '100%',
-//     height: FRAME_BAR_HEIGHT + TIME_BAR_HEIGHT,
-//   },
-//   timeBar: {
-//     height: TIME_BAR_HEIGHT,
-//     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-//     flexDirection: 'row',
-//     alignItems: 'center',
-//     paddingHorizontal: 10,
-//   },
-//   timeBarProgress: {
-//     position: 'absolute',
-//     left: 0,
-//     top: 0,
-//     height: '10%',
-//     backgroundColor: 'rgb(255, 255, 255)',
-//   },
-//   timeText: {
-//     color: 'white',
-//     fontSize: 12,
-//     position: 'absolute',
-//     right: 10,
-//   },
-//   frameBarContainer: {
-//     height: FRAME_BAR_HEIGHT,
-//     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-//   },
-//   frameItem: {
-//     width: FRAME_WIDTH - 2, // Subtract margin
-//     height: FRAME_BAR_HEIGHT - 20,
-//     // marginHorizontal: 1,
-//     backgroundColor: '#666',
-//     // borderRadius: 4,
-//     overflow: 'hidden',
-//   },
-//   handleBar: {
-//     position: 'absolute',
-//     width: 20,
-//     height: FRAME_BAR_HEIGHT,
-//     backgroundColor: 'rgba(255, 255, 255, 0.3)',
-//     zIndex: 100,
-//   },
-//   leftHandle: {
-//     borderLeftWidth: 3,
-//     borderLeftColor: '#007AFF',
-//   },
-//   rightHandle: {
-//     borderRightWidth: 3,
-//     borderRightColor: '#007AFF',
-//   },
-//   selectionOverlay: {
-//     position: 'absolute',
-//     height: FRAME_BAR_HEIGHT,
-//     backgroundColor: 'rgba(0, 122, 255, 0.2)',
-//     zIndex: 50,
-//   },
-// });
-
-// WORKING CODE - without split - ALL good
-// import * as React from 'react';
-// import {
-//   StyleSheet,
-//   View,
-//   Text,
-//   TouchableOpacity,
-//   Dimensions,
-//   ScrollView,
-//   Image,
-//   ActivityIndicator,
-// } from 'react-native';
-// import {
-//   launchImageLibrary,
-//   type ImagePickerResponse,
-// } from 'react-native-image-picker';
-// import Video from 'react-native-video';
-// import {useState, useRef} from 'react';
-// import {VideoUtils} from './services/VideoUtils';
-// import {Frame} from './types';
-
-// // Constants for layout and dimensions
-// const {width: SCREEN_WIDTH} = Dimensions.get('window');
-// const FRAME_BAR_HEIGHT = 60;
-// const TIMELINE_CENTER = SCREEN_WIDTH / 2;
-// const FRAME_WIDTH = VideoUtils.FRAME_WIDTH;
-// const TIME_INDICATOR_HEIGHT = 25;
-// const FRAME_STATUS = {
-//   READY: {name: {description: 'ready'}},
-// };
-
-// export default function VideoClip() {
-//   // State management
-//   const [videoUri, setVideoUri] = useState<string | null>(null);
-//   const [isPlaying, setIsPlaying] = useState(false);
-//   const [currentTime, setCurrentTime] = useState(0);
-//   const [duration, setDuration] = useState(0);
-//   const [frames, setFrames] = useState<Frame[]>([]);
-//   const [isGeneratingFrames, setIsGeneratingFrames] = useState(false);
-
-//   // Refs for components and scroll state
-//   const videoRef = useRef<Video>(null);
-//   const scrollViewRef = useRef<ScrollView>(null);
-//   const scrollOffset = useRef(0);
-//   const isUserScrolling = useRef(false);
-
-//   // Time formatting helper
-//   const formatTime = (time: number) => {
-//     const minutes = Math.floor(time / 60);
-//     const seconds = Math.floor(time % 60);
-//     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-//   };
-
-//   // Frame generation logic
-//   const generateFrames = async (uri: string, videoDuration: number) => {
-//     const numberOfFrames = Math.ceil(videoDuration * VideoUtils.FRAME_PER_SEC);
-//     const timestamp = new Date().getTime();
-//     setIsGeneratingFrames(true);
-
-//     try {
-//       await VideoUtils.getFrames(
-//         `frame_${timestamp}`,
-//         uri,
-//         numberOfFrames,
-//         (outputPath: string) => {
-//           const _framesURI = Array.from({length: numberOfFrames}, (_, i) =>
-//             outputPath.replace('%4d', String(i + 1).padStart(4, '0'))
-//           );
-
-//           const _frames = _framesURI.map(_frameURI => ({
-//             uri: _frameURI,
-//             status: FRAME_STATUS.READY.name.description,
-//             timestamp: timestamp,
-//           }));
-
-//           setFrames(_frames);
-//           setIsGeneratingFrames(false);
-//         },
-//         () => {
-//           console.error('Failed to generate frames');
-//           setIsGeneratingFrames(false);
-//         },
-//         (frameUri, processedFrames, totalFrames) => {
-//           console.log(`Generated frame ${processedFrames}/${totalFrames}`);
-//         },
-//       );
-//     } catch (error) {
-//       console.error('Error generating frames:', error);
-//       setIsGeneratingFrames(false);
-//     }
-//   };
-
-//   // Scroll handling for manual frame navigation
-//   const handleScroll = (event: any) => {
-//     const offsetX = event.nativeEvent.contentOffset.x;
-//     scrollOffset.current = offsetX;
-
-//     if (isUserScrolling.current) {
-//       // Calculate frame index and corresponding time
-//       const frameIndex = Math.floor(offsetX / FRAME_WIDTH);
-//       const newTime = Math.max(0, Math.min(duration, (frameIndex / frames.length) * duration));
-
-//       // Update video position and time display
-//       setCurrentTime(newTime);
-//       if (videoRef.current) {
-//         videoRef.current.seek(newTime);
-//       }
-//     }
-//   };
-
-//   // Video playback progress handler
-//   const onProgress = (data: any) => {
-//     if (!isUserScrolling.current) {
-//       setCurrentTime(data.currentTime);
-
-//       // Scroll frame bar during playback
-//       if (isPlaying && scrollViewRef.current && frames.length > 0) {
-//         const progress = data.currentTime / duration;
-//         const scrollX = Math.floor(progress * (frames.length * FRAME_WIDTH));
-
-//         scrollViewRef.current.scrollTo({
-//           x: scrollX,
-//           animated: false
-//         });
-//       }
-//     }
-//   };
-
-//   // Video loading handler
-//   const onVideoLoad = (data: any) => {
-//     setDuration(data.duration);
-//     if (videoUri) {
-//       generateFrames(videoUri, data.duration);
-//       scrollViewRef.current?.scrollTo({x: 0, animated: false});
-//     }
-//   };
-
-//   // Playback controls
-//   const togglePlayPause = () => {
-//     setIsPlaying(!isPlaying);
-//   };
-
-//   // Media selection handler
-//   const onMediaLoaded = async (response: ImagePickerResponse) => {
-//     if (response.assets?.[0]?.uri) {
-//       await VideoUtils.cleanFrames();
-//       setFrames([]);
-//       setIsGeneratingFrames(false);
-//       setVideoUri(response.assets[0].uri);
-//     }
-//   };
-
-//   // Reset state
-//   const resetVideoState = async () => {
-//     setIsPlaying(false);
-//     await VideoUtils.cleanFrames();
-//     setFrames([]);
-//     setVideoUri(null);
-//     setCurrentTime(0);
-//     setDuration(0);
-//     setIsGeneratingFrames(false);
-//   };
-
-//   return (
-//     <View style={styles.container}>
-//       {videoUri ? (
-//         <View style={styles.videoContainer}>
-//           {/* Navigation buttons */}
-//           <TouchableOpacity style={styles.backButton} onPress={resetVideoState}>
-//             <Text style={styles.backButtonText}>←</Text>
-//           </TouchableOpacity>
-//           <TouchableOpacity style={styles.nextButton}>
-//             <Text style={styles.nextButtonText}>Next</Text>
-//           </TouchableOpacity>
-
-//           {/* Video player */}
-//           <Video
-//             ref={videoRef}
-//             source={{uri: videoUri}}
-//             style={styles.video}
-//             resizeMode="contain"
-//             paused={!isPlaying || isUserScrolling.current}
-//             onLoad={onVideoLoad}
-//             onProgress={onProgress}
-//             repeat={false}
-//           />
-
-//           {/* Playback control */}
-//           <TouchableOpacity style={styles.playButton} onPress={togglePlayPause}>
-//             <Text style={styles.playButtonText}>{isPlaying ? '⏸️' : '▶️'}</Text>
-//           </TouchableOpacity>
-
-//           {/* Timeline section */}
-//           <View style={styles.timelineContainer}>
-//             <View style={styles.timeIndicator}>
-//               <Text style={styles.timeText}>{formatTime(currentTime)}</Text>
-//             </View>
-
-//             <View style={styles.centerLine} />
-
-//             {/* Frame strip */}
-//             <ScrollView
-//               ref={scrollViewRef}
-//               horizontal
-//               showsHorizontalScrollIndicator={false}
-//               contentContainerStyle={styles.framesContainer}
-//               onScroll={handleScroll}
-//               onScrollBeginDrag={() => {
-//                 setIsPlaying(false);
-//                 isUserScrolling.current = true;
-//               }}
-//               onScrollEndDrag={() => {
-//                 setTimeout(() => {
-//                   isUserScrolling.current = false;
-//                 }, 50);
-//               }}
-//               onMomentumScrollEnd={() => {
-//                 isUserScrolling.current = false;
-//               }}
-//               scrollEventThrottle={16}
-//               removeClippedSubviews={true}
-//               decelerationRate="fast">
-//               <View style={{width: TIMELINE_CENTER}} />
-//               {isGeneratingFrames ? (
-//                 <View style={styles.loadingContainer}>
-//                   <ActivityIndicator color="#fff" />
-//                   <Text style={styles.loadingText}>Generating frames...</Text>
-//                 </View>
-//               ) : (
-//                 frames.map((frame, index) => (
-//                   <Image
-//                     key={`frame-${index}`}
-//                     source={{uri: `file:///${frame.uri}`}}
-//                     style={styles.frameImage}
-//                     resizeMode="cover"
-//                   />
-//                 ))
-//               )}
-//               <View style={{width: TIMELINE_CENTER}} />
-//             </ScrollView>
-//           </View>
-
-//           {/* Tools section */}
-//           <View style={styles.toolsContainer}>
-//             <TouchableOpacity style={styles.tool}>
-//               <Text style={styles.toolText}>Split</Text>
-//             </TouchableOpacity>
-//             <TouchableOpacity style={styles.tool}>
-//               <Text style={styles.toolText}>Trim</Text>
-//             </TouchableOpacity>
-//             <TouchableOpacity style={styles.tool}>
-//               <Text style={styles.toolText}>Delete</Text>
-//             </TouchableOpacity>
-//           </View>
-//         </View>
-//       ) : (
-//         <TouchableOpacity
-//           style={styles.selectButton}
-//           onPress={() => {
-//             launchImageLibrary(
-//               {
-//                 mediaType: 'video',
-//                 includeExtra: true,
-//                 assetRepresentationMode: 'current',
-//               },
-//               onMediaLoaded,
-//             );
-//           }}>
-//           <Text style={styles.buttonText}>Select Video</Text>
-//         </TouchableOpacity>
-//       )}
-//     </View>
-//   );
-// }
-
 import * as React from 'react';
 import {
   StyleSheet,
@@ -897,62 +6,133 @@ import {
   TouchableOpacity,
   Dimensions,
   ScrollView,
-  Image,
-  Animated,
-  PanResponder,
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import {
-  launchImageLibrary,
-  type ImagePickerResponse,
-} from 'react-native-image-picker';
+import {useState, useRef, useCallback, useEffect} from 'react';
+import {launchImageLibrary} from 'react-native-image-picker';
 import Video from 'react-native-video';
-import {useState, useRef} from 'react';
+import {GestureHandlerRootView} from 'react-native-gesture-handler';
+import {useSharedValue} from 'react-native-reanimated';
+import rnfs from 'react-native-fs';
+import {FFmpegKit} from 'ffmpeg-kit-react-native';
+import Icon from 'react-native-vector-icons/Entypo';
 import {VideoUtils} from './services/VideoUtils';
 import {Frame} from './types';
-import {FFmpegKit} from 'ffmpeg-kit-react-native';
-import RNFS from 'react-native-fs';
+import AudioTrimTimelineFun from './components/AudioTrimTimelineFun';
+import FramePicks from './components/FramePicks';
+import {trimVideo} from './FrameTrim';
 
-// Constants for layout and dimensions
+// Constants
 const {width: SCREEN_WIDTH} = Dimensions.get('window');
-const FRAME_BAR_HEIGHT = 60;
+const FRAME_BAR_HEIGHT = 50;
 const TIMELINE_CENTER = SCREEN_WIDTH / 2;
 const FRAME_WIDTH = VideoUtils.FRAME_WIDTH;
 const TIME_INDICATOR_HEIGHT = 25;
-const FRAME_STATUS = {
-  READY: {name: {description: 'ready'}},
-};
 
-export default function VideoClip() {
+interface SplitPoint {
+  id: string;
+  time: number;
+  frameIndex: number;
+}
+
+interface ProcessingProgress {
+  segment: number;
+  total: number;
+  progress: number;
+}
+
+interface VideoSegment {
+  startTime: number;
+  endTime: number;
+  duration: number;
+}
+
+const VideoClip = () => {
   const [videoUri, setVideoUri] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
+  const [currentTime, setCurrentTime] = useState<any>(0);
   const [duration, setDuration] = useState(0);
+  const [isVideoReady, setIsVideoReady] = useState(false);
   const [frames, setFrames] = useState<Frame[]>([]);
   const [isGeneratingFrames, setIsGeneratingFrames] = useState(false);
+  const [frameGenerationProgress, setFrameGenerationProgress] = useState(0);
+  const [value, setValue] = useState({min: 0, max: frames.length});
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [isSplitSelecting, setIsSplitSelecting] = useState<boolean>(false);
+  const [splitPoints, setSplitPoints] = useState<SplitPoint[]>([]);
+  const [processingProgress, setProcessingProgress] =
+    useState<ProcessingProgress | null>(null);
+  const [selectedTimeRange, setSelectedTimeRange] = useState({
+    start: 0,
+    end: 0,
+  });
+  const [isFrameBarTouched, setIsFrameBarTouched] = useState(false);
+  const [isCropping, setIsCropping] = useState(false);
+  const [saveButtonDisabled, setSaveButtonDisabled] = useState(true);
+  const [trimStartTime, setTrimStartTime] = useState(0);
+  const [trimEndTime, setTrimEndTime] = useState(0);
 
-  const [isSplitting, setIsSplitting] = useState(false);
-  const [startTime, setStartTime] = useState(0);
-  const [endTime, setEndTime] = useState(0);
-  const leftHandlePosition = useRef(new Animated.Value(0)).current;
-  const rightHandlePosition = useRef(new Animated.Value(0)).current;
+  const startSplitPosition = useSharedValue(0);
+  const endSplitPosition = useSharedValue(0);
 
   const videoRef = useRef<Video>(null);
   const scrollViewRef = useRef<ScrollView>(null);
-  const scrollOffset = useRef(0);
   const isUserScrolling = useRef(false);
 
-  const formatTime = (time: number) => {
+  useEffect(() => {
+    return () => handleCleanup();
+  }, []);
+
+  const handleCleanup = async () => {
+    try {
+      await VideoUtils.cleanFrames();
+      setFrames([]);
+      setIsGeneratingFrames(false);
+      setVideoUri(null);
+    } catch (error) {
+      console.error('Cleanup error:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (duration > 0 && frames.length > 0) {
+      setValue({min: 0, max: frames.length});
+      setSelectedTimeRange({start: 0, end: duration});
+    }
+  }, [duration, frames.length]);
+
+  const resetVideoState = useCallback(async () => {
+    setIsPlaying(false);
+    setCurrentTime(0);
+    setDuration(0);
+    setIsVideoReady(false);
+    setIsSplitSelecting(false);
+    setSplitPoints([]);
+    setSelectedTimeRange({start: 0, end: 0});
+    setValue({min: 0, max: 0});
+    startSplitPosition.value = 0;
+    endSplitPosition.value = 0;
+    setFrames([]);
+    setIsCropping(false);
+    setSaveButtonDisabled(true);
+    await handleCleanup();
+  }, []);
+
+  const formatTime = useCallback((time: number): string => {
     const minutes = Math.floor(time / 60);
     const seconds = Math.floor(time % 60);
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-  };
+    const milliseconds = Math.floor((time % 1) * 100);
+    return `${minutes}:${seconds.toString().padStart(2, '0')}.${milliseconds
+      .toString()
+      .padStart(2, '0')}`;
+  }, []);
 
   const generateFrames = async (uri: string, videoDuration: number) => {
     const numberOfFrames = Math.ceil(videoDuration * VideoUtils.FRAME_PER_SEC);
-    const timestamp = new Date().getTime();
+    const timestamp = Date.now();
     setIsGeneratingFrames(true);
+    setFrameGenerationProgress(0);
 
     try {
       await VideoUtils.getFrames(
@@ -966,245 +146,363 @@ export default function VideoClip() {
 
           const _frames = _framesURI.map(_frameURI => ({
             uri: _frameURI,
-            status: FRAME_STATUS.READY.name.description,
+            status: 'ready',
             timestamp: timestamp,
           }));
+
           setFrames(_frames);
           setIsGeneratingFrames(false);
         },
         () => {
-          console.error('Failed to generate frames',);
+          Alert.alert('Error', 'Failed to generate frames. Please try again.');
           setIsGeneratingFrames(false);
         },
-        (frameUri, processedFrames, totalFrames) => {
-          console.log(`Generated frame ${processedFrames}/${totalFrames}`);
+        (_, processedFrames, totalFrames) => {
+          setFrameGenerationProgress(processedFrames / totalFrames);
         },
       );
     } catch (error) {
-      console.error('Error generating frames:', error);
+      console.error('Frame generation error:', error);
+      Alert.alert('Error', 'An error occurred while generating frames.');
       setIsGeneratingFrames(false);
     }
   };
 
-  const createPanResponder = (isLeft: boolean) => {
-    const handlePosition = isLeft ? leftHandlePosition : rightHandlePosition;
+  const handleValueChange = (newValue: {min: number; max: number}) => {
+    setValue(newValue);
+    const newStartTime = frameToTimestamp(
+      newValue.min,
+      frames.length,
+      duration,
+    );
+    const newEndTime = frameToTimestamp(newValue.max, frames.length, duration);
+    const newTrimStartTime = parseTimeToSeconds(newStartTime);
+    const newTrimEndTime = parseTimeToSeconds(newEndTime);
 
-    return PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
+    setTrimStartTime(newTrimStartTime);
+    setTrimEndTime(newTrimEndTime);
 
-      onPanResponderGrant: () => {
-        handlePosition.setOffset(handlePosition.__getValue());
-        handlePosition.setValue(0);
-      },
+    if (currentTime < newTrimStartTime || currentTime > newTrimEndTime) {
+      setCurrentTime(newTrimStartTime);
+      videoRef.current?.seek(newTrimStartTime);
+      if (isPlaying) {
+        setIsPlaying(false);
+      }
+    }
+  };
 
-      onPanResponderMove: (_, gesture) => {
-        const currentScrollOffset = scrollOffset.current || 0;
-        const totalWidth = frames.length * FRAME_WIDTH;
-        console.log('totalWidth', frames.length, FRAME_WIDTH);
+  const parseTimeToSeconds = (timestamp: string): number => {
+    const [minutes, rest] = timestamp.split(':');
+    const [seconds, milliseconds] = rest.split('.');
+    return (
+      parseInt(minutes) * 60 + parseInt(seconds) + parseInt(milliseconds) / 100
+    );
+  };
 
-        // Calculate position relative to scroll content
-        const rawPosition = gesture.moveX + currentScrollOffset;
+  const handleFrameTrim = async () => {
+    setIsCropping(true);
+    trimVideo(
+      videoUri,
+      frameToTimestamp(value.min, frames.length, duration),
+      frameToTimestamp(value.max, frames.length, duration),
+    );
+    try {
+      const downloadDir = rnfs.DownloadDirectoryPath;
+      const appName = 'FrameTrimmer';
+      const appDir = `${downloadDir}/${appName}`;
 
-        // Establish movement boundaries
-        const minPosition = isLeft
-          ? TIMELINE_CENTER // Left handle can't go before timeline center
-          : leftHandlePosition.__getValue() + FRAME_WIDTH;
-        const maxPosition = isLeft
-          ? rightHandlePosition.__getValue() - FRAME_WIDTH
-          : totalWidth;
+      const exists = await rnfs.exists(appDir);
+      if (!exists) {
+        await rnfs.mkdir(appDir);
+      }
 
-        // Constrain handle position
-        const newPosition = Math.max(
-          minPosition,
-          Math.min(maxPosition, rawPosition),
+      const outputPath = `${downloadDir}/${appName}/trimmed_${Date.now()}.mp4`;
+      const command = `-i "${videoUri}" -ss ${frameToTimestamp(
+        value.min,
+        frames.length,
+        duration,
+      )} -to ${frameToTimestamp(
+        value.max,
+        frames.length,
+        duration,
+      )} -c copy "${outputPath}"`;
+
+      await FFmpegKit.execute(command);
+      Alert.alert('Success', `Video saved to: ${outputPath}`, [
+        {
+          text: 'OK',
+          onPress: async () => {
+            setIsPlaying(false);
+            setCurrentTime(0);
+            setDuration(0);
+            setIsVideoReady(false);
+            setFrames([]);
+            setIsGeneratingFrames(false);
+            setFrameGenerationProgress(0);
+            setValue({min: 0, max: 0});
+            setIsProcessing(false);
+            setIsSplitSelecting(false);
+            setSplitPoints([]);
+            setProcessingProgress(null);
+            setSelectedTimeRange({start: 0, end: 0});
+            setIsFrameBarTouched(false);
+            setIsCropping(false);
+            setSaveButtonDisabled(true);
+            setTrimStartTime(0);
+            setTrimEndTime(0);
+            setVideoUri(null);
+            await handleCleanup();
+          },
+        },
+      ]);
+    } catch (error) {
+      console.error('Trim error:', error);
+      Alert.alert('Error', 'Failed to trim video');
+    }
+  };
+
+  const handleScroll = useCallback(
+    (event: any) => {
+      if (isUserScrolling.current) {
+        const offsetX = event.nativeEvent.contentOffset.x;
+        const frameIndex = Math.floor(offsetX / FRAME_WIDTH);
+        let newTime = Math.max(
+          0,
+          Math.min(duration, (frameIndex / frames.length) * duration),
         );
-
-        // Update handle position
-        handlePosition.setValue(newPosition - handlePosition._offset);
-
-        // Calculate and update video time for left handle
-        if (isLeft && videoRef.current) {
-          const adjustedPosition = newPosition - TIMELINE_CENTER;
-          const time = (adjustedPosition / totalWidth) * duration;
-          // Seek to calculated time
-          videoRef.current.seek(Math.max(0, Math.min(duration, time)));
-          // Update start time for potential saving
-          setStartTime(time);
+        if (isCropping) {
+          newTime = Math.max(trimStartTime, Math.min(trimEndTime, newTime));
         }
-        // Update right handle's end time when moved
-        if (!isLeft) {
-          const adjustedPosition = newPosition - TIMELINE_CENTER;
-          const time = (adjustedPosition / totalWidth) * duration;
-          console.log('this is time', adjustedPosition, totalWidth, duration);
-          setEndTime(time);
+        setCurrentTime(newTime);
+        videoRef.current?.seek(newTime);
+        if (isCropping && isPlaying) {
+          setIsPlaying(false);
         }
-      },
-      onPanResponderRelease: () => {
-        handlePosition.flattenOffset();
-      },
-    });
-  };
-
-  const leftPanResponder = useRef(createPanResponder(true)).current;
-  const rightPanResponder = useRef(createPanResponder(false)).current;
-
-  const handleSplitPress = () => {
-    setIsSplitting(true);
-    setIsPlaying(false);
-
-    // Calculate current frame position
-    const totalWidth = frames.length * FRAME_WIDTH;
-    const currentPosition = Math.max(
-      TIMELINE_CENTER,
-      (currentTime / duration) * totalWidth,
-    );
-
-    // Set left handle at first frame (TIMELINE_CENTER)
-    leftHandlePosition.setValue(TIMELINE_CENTER);
-
-    // Set right handle at current position or minimum valid position
-    rightHandlePosition.setValue(
-      Math.max(currentPosition, TIMELINE_CENTER + FRAME_WIDTH),
-    );
-  };
-
-  const handleScroll = (event: any) => {
-    const offsetX = event.nativeEvent.contentOffset.x;
-    scrollOffset.current = offsetX;
-
-    if (isUserScrolling.current) {
-      const frameIndex = Math.floor(offsetX / FRAME_WIDTH);
-      const newTime = Math.max(
-        0,
-        Math.min(duration, (frameIndex / frames.length) * duration),
-      );
-
-      setCurrentTime(newTime);
-      if (videoRef.current) {
-        videoRef.current.seek(newTime);
       }
-    }
-  };
+    },
+    [
+      duration,
+      frames.length,
+      isCropping,
+      trimStartTime,
+      trimEndTime,
+      isPlaying,
+    ],
+  );
 
-  const onProgress = (data: any) => {
-    if (!isUserScrolling.current) {
-      setCurrentTime(data.currentTime);
+  const onProgress = useCallback(
+    (data: any) => {
+      if (!isUserScrolling.current) {
+        const newTime = data.currentTime;
 
-      if (isPlaying && scrollViewRef.current && frames.length > 0) {
-        const progress = data.currentTime / duration;
-        const scrollX = Math.floor(progress * (frames.length * FRAME_WIDTH));
-        scrollViewRef.current.scrollTo({
-          x: scrollX,
-          animated: false,
-        });
+        if (isCropping) {
+          if (newTime >= trimEndTime - 0.1) {
+            setCurrentTime(trimStartTime);
+            videoRef.current?.seek(trimStartTime);
+            setIsPlaying(false); // Stop at the end of trim
+          } else if (newTime < trimStartTime) {
+            setCurrentTime(trimStartTime);
+            videoRef.current?.seek(trimStartTime);
+          } else {
+            setCurrentTime(newTime);
+          }
+        } else {
+          setCurrentTime(newTime);
+        }
+        if (isPlaying && scrollViewRef.current && frames.length > 0) {
+          let scrollTime = newTime;
+          if (isCropping) {
+            scrollTime = Math.max(
+              trimStartTime,
+              Math.min(trimEndTime, newTime),
+            );
+          }
+          const scrollX = Math.floor(
+            (scrollTime / duration) * (frames.length * FRAME_WIDTH),
+          );
+          scrollViewRef.current.scrollTo({x: scrollX, animated: false});
+        }
       }
-    }
-  };
+    },
+    [
+      duration,
+      frames.length,
+      isPlaying,
+      isCropping,
+      trimStartTime,
+      trimEndTime,
+    ],
+  );
 
-  const onVideoLoad = (data: any) => {
-    setDuration(data.duration);
-    console.log('this is data', data);
-    if (videoUri) {
-      generateFrames(videoUri, data.duration);
-      scrollViewRef.current?.scrollTo({x: 0, animated: false});
-    }
-  };
+  const onVideoLoad = useCallback(
+    (data: any) => {
+      setDuration(data.duration);
+      setIsVideoReady(true);
+      if (videoUri) {
+        generateFrames(videoUri, data.duration);
+        scrollViewRef.current?.scrollTo({x: 0, animated: false});
+      }
+    },
+    [videoUri],
+  );
 
-  const togglePlayPause = () => {
-    setIsPlaying(!isPlaying);
-  };
-
-  const onMediaLoaded = async (response: ImagePickerResponse) => {
+  const onMediaLoaded = useCallback(async (response: any) => {
     if (response.assets?.[0]?.uri) {
-      await VideoUtils.cleanFrames();
-      setFrames([]);
-      setIsGeneratingFrames(false);
+      await handleCleanup();
+      setSplitPoints([]);
       setVideoUri(response.assets[0].uri);
     }
-  };
+  }, []);
 
-  const resetVideoState = async () => {
-    setIsPlaying(false);
-    await VideoUtils.cleanFrames();
-    setFrames([]);
-    setVideoUri(null);
-    setCurrentTime(0);
-    setDuration(0);
-    setIsGeneratingFrames(false);
-  };
+  const frameToTimestamp = useCallback(
+    (frameIndex: number, totalFrames: number, duration: number): string => {
+      const totalSeconds = (frameIndex / totalFrames) * duration;
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = Math.floor(totalSeconds % 60);
+      const milliseconds = Math.floor((totalSeconds % 1) * 100);
+      return `${minutes.toString().padStart(2, '0')}:${seconds
+        .toString()
+        .padStart(2, '0')}.${milliseconds.toString().padStart(2, '0')}`;
+    },
+    [],
+  );
 
-  const handleSaveVideoSection = async () => {
-    console.log('this is save vid', videoUri, startTime, endTime);
-
-    if (!videoUri || !startTime || !endTime) {
-      Alert.alert('Error', 'No video section selected');
+  const handleSaveVideoSections = async () => {
+    if (isCropping) {
+      handleFrameTrim();
       return;
     }
-    const clipDuration = endTime - startTime;
-    // try {
-    //   const outputPath = `${
-    //     RNFS.DownloadDirectoryPath
-    //   }/split_${Date.now()}.mp4`;
-
-    //   const command = `-i "${videoUri}" -ss ${startTime.toFixed(3)} -t ${(
-    //     endTime - startTime
-    //   ).toFixed(3)} -c:v copy -c:a copy "${outputPath}"`;
-
-    //   const result = await FFmpegKit.execute(command);
-    //   const returnCode = await result.getReturnCode();
-
-    //   if (returnCode.isValueSuccess()) {
-    //     Alert.alert('Success', 'Video section saved successfully!', [
-    //       {
-    //         text: 'OK',
-    //         onPress: () => {
-    //           resetVideoState();
-    //         },
-    //       },
-    //     ]);
-    //   } else {
-    //     const output = await result.getOutput();
-    //     console.error('FFmpeg error output:', output);
-    //     Alert.alert('Error', 'Failed to save video section. Please try again.');
-    //   }
-    // } catch (error) {
-    //   console.error('Split failed:', error);
-    //   Alert.alert('Error', 'Failed to save video section');
-    // }
+    if (!videoUri || splitPoints.length === 0) {
+      Alert.alert('Error', 'Please add split points first');
+      return;
+    }
+    setIsProcessing(true);
+    setProcessingProgress({
+      segment: 0,
+      total: splitPoints.length + 1,
+      progress: 0,
+    });
     try {
-      const outputPath = `${
-        RNFS.DownloadDirectoryPath
-      }/split_${Date.now()}.mp4`;
-      const command = `-i "${videoUri}" -ss ${startTime.toFixed(
-        3,
-      )} -t ${clipDuration.toFixed(3)} -c:v copy -c:a copy "${outputPath}"`;
-
-      const result = await FFmpegKit.execute(command);
-      const returnCode = await result.getReturnCode();
-
-      if (returnCode.isValueSuccess()) {
-        Alert.alert('Success', 'Video section saved successfully!');
-      } else {
-        const output = await result.getOutput();
-        console.error('FFmpeg error output:', output);
-        Alert.alert('Error', 'Failed to save video section. Please try again.');
-      }
+      const segments: VideoSegment[] = [];
+      let startTime = 0;
+      [...splitPoints, {time: duration}].forEach(point => {
+        segments.push({
+          startTime,
+          endTime: point.time,
+          duration: point.time - startTime,
+        });
+        startTime = point.time;
+      });
+      const outputPaths = await Promise.all(
+        segments.map((segment, index) =>
+          processingProgress(segment, index, segments.length),
+        ),
+      );
+      Alert.alert(
+        'Success',
+        `Successfully saved ${segments.length} video segments`,
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              resetVideoState();
+            },
+          },
+        ],
+      );
+      return outputPaths;
     } catch (error) {
-      console.error('Split failed:', error);
-      Alert.alert('Error', 'Failed to save video section');
+      console.error('Video processing error:', error);
+      Alert.alert(
+        'Error',
+        'Failed to process video segments. Please try again.',
+      );
+    } finally {
+      setIsProcessing(false);
+      setProcessingProgress(null);
     }
   };
 
+  const renderSplitMarkers = useCallback(
+    () => (
+      <View style={StyleSheet.absoluteFill}>
+        {splitPoints.map(point => (
+          <View
+            key={point.id}
+            style={[
+              styles.splitPoint,
+              {
+                transform: [{translateX: point.frameIndex * FRAME_WIDTH}],
+                height: FRAME_BAR_HEIGHT + 20,
+              },
+            ]}>
+            <TouchableOpacity
+              style={styles.removeSplitButton}
+              onPress={() =>
+                setSplitPoints(prev => prev.filter(p => p.id !== point.id))
+              }>
+              <Text style={styles.removeSplitText}>✕</Text>
+            </TouchableOpacity>
+            <View style={styles.splitLine} />
+            <Text style={styles.splitTimeText}>{formatTime(point.time)}</Text>
+          </View>
+        ))}
+      </View>
+    ),
+    [splitPoints, formatTime],
+  );
+
+  const handleAddSplitPoint = useCallback(() => {
+    if (!isVideoReady) return;
+    setIsPlaying(false);
+    const newSplitPoint = {
+      id: Date.now().toString(),
+      time: currentTime,
+      frameIndex: value.max,
+    };
+
+    setSplitPoints(prev => {
+      const newSplits = [...prev, newSplitPoint].sort(
+        (a, b) => a.time - b.time,
+      );
+      startSplitPosition.value = value.max * FRAME_WIDTH;
+      endSplitPosition.value = frames.length * FRAME_WIDTH;
+      setSelectedTimeRange({
+        start: currentTime,
+        end: duration,
+      });
+      setValue({
+        min: value.max,
+        max: frames.length,
+      });
+
+      return newSplits;
+    });
+  }, [duration, frames.length, isVideoReady, isSplitSelecting, value]);
+
+  const togglePlayPause = useCallback(() => {
+    if (isCropping && !isPlaying) {
+      videoRef.current?.seek(trimStartTime);
+      setCurrentTime(trimStartTime);
+    }
+    setIsPlaying(prev => !prev);
+  }, [isCropping, trimStartTime]);
+
   return (
-    <View style={styles.container}>
-      <TouchableOpacity style={styles.backButton} onPress={resetVideoState}>
-        <Text style={styles.backButtonText}>←</Text>
+    <GestureHandlerRootView style={styles.container}>
+      <TouchableOpacity
+        style={styles.backButton}
+        onPress={() => resetVideoState()}>
+        <Icon name={'cross'} size={24} color="white" />
       </TouchableOpacity>
       <TouchableOpacity
-        style={styles.nextButton}
-        onPress={handleSaveVideoSection}>
-        <Text style={styles.nextButtonText}>Save</Text>
+        style={[
+          styles.nextButton,
+          (!isCropping || isProcessing) && styles.toolDisabled,
+        ]}
+        onPress={() => handleSaveVideoSections()}
+        disabled={!isCropping || isProcessing}>
+        <Text style={styles.toolText2}>Save</Text>
       </TouchableOpacity>
 
       {videoUri ? (
@@ -1219,16 +517,19 @@ export default function VideoClip() {
             onProgress={onProgress}
             repeat={false}
           />
-
-          <TouchableOpacity style={styles.playButton} onPress={togglePlayPause}>
-            <Text style={styles.playButtonText}>{isPlaying ? '⏸️' : '▶️'}</Text>
-          </TouchableOpacity>
-
           <View style={styles.timelineContainer}>
+            <TouchableOpacity
+              style={styles.playButton}
+              onPress={togglePlayPause}>
+              {isPlaying ? (
+                <Icon name={'controller-paus'} size={24} color="white" />
+              ) : (
+                <Icon name={'controller-play'} size={24} color="white" />
+              )}
+            </TouchableOpacity>
             <View style={styles.timeIndicator}>
               <Text style={styles.timeText}>{formatTime(currentTime)}</Text>
             </View>
-
             <View style={styles.centerLine} />
             <ScrollView
               ref={scrollViewRef}
@@ -1239,14 +540,12 @@ export default function VideoClip() {
               onScrollBeginDrag={() => {
                 setIsPlaying(false);
                 isUserScrolling.current = true;
+                // PerformanceEntry;
               }}
               onScrollEndDrag={() => {
                 setTimeout(() => {
                   isUserScrolling.current = false;
                 }, 50);
-              }}
-              onMomentumScrollEnd={() => {
-                isUserScrolling.current = false;
               }}
               scrollEventThrottle={16}
               removeClippedSubviews={true}
@@ -1255,67 +554,119 @@ export default function VideoClip() {
               {isGeneratingFrames ? (
                 <View style={styles.loadingContainer}>
                   <ActivityIndicator color="#fff" />
-                  <Text style={styles.loadingText}>Generating frames...</Text>
+                  <Text style={styles.loadingText}>
+                    Generating frames...{' '}
+                    {Math.round(frameGenerationProgress * 100)}%
+                  </Text>
                 </View>
               ) : (
-                frames.map((frame, index) => (
-                  <Image
-                    key={`frame-${index}`}
-                    source={{uri: `file:///${frame.uri}`}}
-                    style={styles.frameImage}
-                    resizeMode="cover"
-                  />
-                ))
+                <TouchableOpacity
+                  style={[styles.framesWrapper, {position: 'relative'}]}>
+                  {renderSplitMarkers()}
+                  {!isSplitSelecting ? (
+                    <FramePicks
+                      data={frames}
+                      splitPoints={splitPoints}
+                      onRemoveSplit={id =>
+                        setSplitPoints(prev => prev.filter(p => p.id !== id))
+                      }
+                      formatTime={formatTime}
+                      isCropping={isCropping}
+                      value={value}
+                    />
+                  ) : (
+                    <View style={styles.trimmerContainer}>
+                      <AudioTrimTimelineFun
+                        min={0}
+                        max={frames.length - 1}
+                        step={1}
+                        timestampStart={frameToTimestamp(
+                          value.min,
+                          frames.length,
+                          duration,
+                        )}
+                        timestampEnd={frameToTimestamp(
+                          value.max,
+                          frames.length,
+                          duration,
+                        )}
+                        sliderWidth={frames.length * FRAME_WIDTH - 20}
+                        onChangeHandler={handleValueChange}
+                        handleStyle={{
+                          width: 4,
+                          height: FRAME_BAR_HEIGHT,
+                          backgroundColor: '#fff',
+                          borderRadius: 0,
+                        }}
+                        railStyle={{
+                          borderColor: '#fff',
+                          borderWidth: 2,
+                          backgroundColor: 'transparent',
+                        }}
+                        renderRails={() => (
+                          <FramePicks
+                            data={frames}
+                            splitPoints={splitPoints}
+                            onRemoveSplit={id =>
+                              setSplitPoints(prev =>
+                                prev.filter(p => p.id !== id),
+                              )
+                            }
+                            formatTime={formatTime}
+                            isCropping={isCropping}
+                            value={value}
+                          />
+                        )}
+                      />
+                    </View>
+                  )}
+                </TouchableOpacity>
               )}
               <View style={{width: TIMELINE_CENTER}} />
-
-              {isSplitting && (
-                <>
-                  <Animated.View
-                    {...leftPanResponder.panHandlers}
-                    style={[
-                      styles.handleBar,
-                      styles.leftHandle,
-                      {
-                        transform: [{translateX: leftHandlePosition}],
-                      },
-                    ]}
-                  />
-                  <Animated.View
-                    {...rightPanResponder.panHandlers}
-                    style={[
-                      styles.handleBar,
-                      styles.rightHandle,
-                      {
-                        transform: [{translateX: rightHandlePosition}],
-                      },
-                    ]}
-                  />
-                  <Animated.View
-                    style={[
-                      styles.selectionOverlay,
-                      {
-                        left: leftHandlePosition,
-                        width: Animated.subtract(
-                          rightHandlePosition,
-                          leftHandlePosition,
-                        ),
-                      },
-                    ]}
-                  />
-                </>
-              )}
             </ScrollView>
           </View>
-          {/* Tools section */}
           <View style={styles.toolsContainer}>
-            <TouchableOpacity style={styles.tool} onPress={handleSplitPress}>
-              <Text style={styles.toolText}>Split</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.tool}>
+            <TouchableOpacity
+              style={[styles.tool, isProcessing && styles.toolDisabled]}
+              onPress={() => {
+                setIsCropping(true);
+                setIsSplitSelecting(true);
+              }}
+              disabled={isProcessing || isGeneratingFrames}>
               <Text style={styles.toolText}>Trim</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.tool}>
+            <TouchableOpacity
+              style={[
+                styles.tool,
+                (isProcessing || isGeneratingFrames || isCropping) &&
+                  styles.toolDisabled,
+              ]}
+              onPress={() => {
+                if (isSplitSelecting) {
+                  handleAddSplitPoint();
+                } else {
+                  setIsSplitSelecting(true);
+                }
+              }}
+              disabled={isProcessing || isGeneratingFrames || isCropping}>
+              <Text style={styles.toolText}>Split</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.tool,
+                (isProcessing || !splitPoints.length) && styles.toolDisabled,
+              ]}
+              onPress={() => setSplitPoints([])}
+              disabled={isProcessing || !splitPoints.length}>
+              <Text style={styles.toolText}>Clear</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.tool, isProcessing && styles.toolDisabled]}
+              disabled={isProcessing}
+              onPress={() => {
+                setIsSplitSelecting(false);
+                setIsCropping(false);
+              }}>
               <Text style={styles.toolText}>Delete</Text>
             </TouchableOpacity>
           </View>
@@ -1336,9 +687,9 @@ export default function VideoClip() {
           <Text style={styles.buttonText}>Select Video</Text>
         </TouchableOpacity>
       )}
-    </View>
+    </GestureHandlerRootView>
   );
-}
+};
 
 const styles = StyleSheet.create({
   container: {
@@ -1350,7 +701,7 @@ const styles = StyleSheet.create({
   },
   video: {
     width: '100%',
-    height: '75%',
+    height: '70%',
   },
   backButton: {
     position: 'absolute',
@@ -1373,35 +724,31 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 20,
   },
+  buttonDisabled: {
+    opacity: 0.5,
+  },
   nextButtonText: {
     color: '#000',
     fontSize: 16,
     fontWeight: 'bold',
   },
   playButton: {
-    position: 'absolute',
-    top: '35%',
-    left: '50%',
-    transform: [{translateX: -30}, {translateY: -30}],
+    alignSelf: 'center',
+    paddingVertical: 20,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    width: 60,
-    height: 60,
-    borderRadius: 30,
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 10,
   },
   playButtonText: {
     color: '#fff',
-    fontSize: 24,
+    fontSize: 28,
+    opacity: 0.9,
   },
-  timelineContainer: {
-    width: '100%',
-    flex: 1,
-    backgroundColor: 'rgb(118, 118, 118)',
-  },
+
   timeIndicator: {
     position: 'absolute',
-    top: 0,
+    top: 50,
     left: TIMELINE_CENTER - 25,
     width: 50,
     height: TIME_INDICATOR_HEIGHT,
@@ -1419,7 +766,7 @@ const styles = StyleSheet.create({
   centerLine: {
     position: 'absolute',
     left: TIMELINE_CENTER,
-    top: TIME_INDICATOR_HEIGHT,
+    top: 70,
     width: 2,
     height: FRAME_BAR_HEIGHT * 2.25,
     backgroundColor: '#fff',
@@ -1444,6 +791,66 @@ const styles = StyleSheet.create({
     color: '#fff',
     marginLeft: 10,
   },
+  splitPoint: {
+    position: 'absolute',
+    alignItems: 'center',
+    zIndex: 1,
+    width: 3,
+    bottom: 10,
+  },
+  splitLine: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#ff4444',
+  },
+  removeSplitButton: {
+    position: 'absolute',
+    top: -25,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#ff4444',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  removeSplitText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  splitTimeText: {
+    position: 'absolute',
+    bottom: -20,
+    color: '#fff',
+    fontSize: 10,
+    width: 60,
+    textAlign: 'center',
+    left: -28,
+  },
+  toolsContainer: {
+    flexDirection: 'row',
+    width: '100%',
+    height: 40,
+    backgroundColor: '#222',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+  },
+  tool: {
+    padding: 10,
+  },
+  toolDisabled: {
+    opacity: 0.5,
+  },
+  toolText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  toolText2: {
+    color: '#000',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
   selectButton: {
     position: 'absolute',
     bottom: 40,
@@ -1458,42 +865,189 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
-  toolsContainer: {
-    flexDirection: 'row',
-    width: '100%',
-    height: 40,
-    backgroundColor: '#222',
-    justifyContent: 'space-around',
+  progressOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 1000,
   },
-  tool: {
-    padding: 10,
-  },
-  toolText: {
-    color: 'white',
+  progressText: {
+    color: '#fff',
     fontSize: 16,
+    marginTop: 20,
+    marginBottom: 10,
   },
-  handleBar: {
+  progressBarContainer: {
+    width: '80%',
+    height: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  progressBar: {
+    height: '100%',
+    backgroundColor: '#4A90E2',
+  },
+  progressPercentage: {
+    color: '#fff',
+    fontSize: 14,
+    marginTop: 10,
+  },
+  splitRange: {
+    position: 'absolute',
+    height: FRAME_BAR_HEIGHT,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+  splitHandle: {
     position: 'absolute',
     width: 20,
     height: FRAME_BAR_HEIGHT,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
     zIndex: 100,
   },
-  rightHandle: {
-    borderRightWidth: 2,
-    borderRightColor: '#FFD700',
+  splitHandleLeft: {
+    paddingRight: 10,
   },
-  selectionOverlay: {
-    position: 'absolute',
+  splitHandleRight: {
+    paddingLeft: 10,
+  },
+  handleBar: {
+    width: 4,
+    height: '100%',
+    backgroundColor: '#fff',
+    borderRadius: 2,
+  },
+  inactiveRailSlider: {
+    flexDirection: 'row',
+    alignItems: 'center',
     height: FRAME_BAR_HEIGHT,
-    backgroundColor: 'rgba(255, 215, 0, 0.2)',
-    borderWidth: 1,
-    borderColor: '#FFD700',
-    zIndex: 50,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
-  leftHandle: {
-    borderLeftWidth: 2,
-    borderLeftColor: '#FFD700',
+  trimmedArea: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: FRAME_BAR_HEIGHT,
+    position: 'absolute',
+  },
+  activeRailSlider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: FRAME_BAR_HEIGHT,
+    position: 'absolute',
+    width: '50%',
+    overflow: 'hidden',
+  },
+  thumbContainer: {
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    height: '100%',
+    width: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  thumbLeft: {
+    borderTopLeftRadius: 12,
+    borderBottomLeftRadius: 12,
+  },
+  thumbRight: {
+    borderTopRightRadius: 12,
+    borderBottomRightRadius: 12,
+  },
+  framesWrapper: {
+    flexDirection: 'row',
+    height: FRAME_BAR_HEIGHT,
+  },
+  handleTime: {
+    position: 'absolute',
+    bottom: -20,
+    color: '#fff',
+    fontSize: 10,
+    width: 60,
+    textAlign: 'center',
+  },
+  trimmerContainer: {
+    height: 120,
+    marginTop: 10,
+    alignSelf: 'center',
+  },
+  framePicksContainer: {
+    flexDirection: 'row',
+  },
+
+  markerWrapper: {
+    position: 'absolute',
+    left: 0,
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    zIndex: 100,
+  },
+  markerLine: {
+    height: '100%',
+    width: 3,
+    backgroundColor: '#ff4444',
+    position: 'relative',
+  },
+  marker: {
+    position: 'absolute',
+    top: 0,
+    left: -2,
+    width: 7,
+    height: '100%',
+    backgroundColor: '#ff4444',
+  },
+  removeButton: {
+    position: 'absolute',
+    top: -25,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#ff4444',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 101,
+  },
+  removeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  markerTime: {
+    position: 'absolute',
+    bottom: -20,
+    color: '#fff',
+    fontSize: 10,
+    width: 60,
+    textAlign: 'center',
+    marginLeft: -30,
+  },
+  timelineContainer: {
+    width: '100%',
+    flex: 1,
+    backgroundColor: '#000',
+  },
+  progressLine: {
+    position: 'absolute',
+    top: 0,
+    width: 2,
+    height: '100%',
+    backgroundColor: '#fff',
+    zIndex: 5,
+  },
+  frameWrapper: {
+    height: FRAME_BAR_HEIGHT,
+    position: 'relative',
+    marginRight: 1,
+    overflow: 'hidden', // This will keep frame content within bounds
+  },
+  trimSelection: {
+    borderColor: '#fff',
+    borderWidth: 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
 });
+
+export default VideoClip;

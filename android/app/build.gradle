@@ -1,6 +1,6 @@
-apply plugin: "com.android.application"
-apply plugin: "org.jetbrains.kotlin.android"
-apply plugin: "com.facebook.react"
+apply plugin: 'com.android.application'
+apply plugin: 'org.jetbrains.kotlin.android'
+apply plugin: 'com.facebook.react'
 
 /**
  * This is the configuration block to customize your React Native Android app.
@@ -77,13 +77,13 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace "com.mlreactnative"
+    namespace 'com.mlreactnative'
     defaultConfig {
-        applicationId "com.mlreactnative"
+        applicationId 'com.mlreactnative'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
-        versionName "1.0"
+        versionName '1.0'
     }
     signingConfigs {
         debug {
@@ -102,10 +102,10 @@ android {
             // see https://reactnative.dev/docs/signed-apk-android.
             signingConfig signingConfigs.debug
             minifyEnabled enableProguardInReleaseBuilds
-            proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
-     configurations.all {
+    configurations.all {
         resolutionStrategy {
             // Force a specific version of FFmpeg
             force 'com.arthenica:ffmpeg-kit-https:6.0-2'
@@ -117,11 +117,17 @@ android {
 
 dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
-    implementation("com.facebook.react:react-android")
-implementation 'com.arthenica:ffmpeg-kit-https:6.0-2'
+    implementation('com.facebook.react:react-android')
+    implementation 'com.arthenica:ffmpeg-kit-https:6.0-2'
     if (hermesEnabled.toBoolean()) {
-        implementation("com.facebook.react:hermes-android")
+        implementation('com.facebook.react:hermes-android')
     } else {
         implementation jscFlavor
     }
 }
+
+project.ext.vectoricons = [
+    iconFontNames: [ 'MaterialIcons.ttf', 'EvilIcons.ttf', 'Entypo.ttf', 'Ionicons.ttf',  'AntDesign.ttf' ] // Specify font files
+]
+
+apply from: file('../../node_modules/react-native-vector-icons/fonts.gradle')
