@@ -15,7 +15,10 @@ Required Dependencies
 ```
 check package.json and following files
 > VideoClip (main component)
-
-> FramePicks (frame display component)
-
+> VideoUtils (Utility function for extracting frames)
 > AudioTrimTimelineFun (trim slider component)
+> FramePicks (frame display component)
+> TimeRuler (to display time)
+> Additional bar (will be used)
+
+Please import assets also
