@@ -64,21 +64,6 @@ type calculateMinMaxOptions = {
 
 const calculateMinMaxValue = (options: calculateMinMaxOptions) => {
   'worklet';
-  // const {min, max, step, minPositionValue, maxPositionValue, maxSliderWidth} =
-  //   options;
-
-  // const minSliderValueNormalized = minPositionValue / maxSliderWidth;
-  // const stepsInRange = (max - min) / step;
-  // const stepsFromMin = minSliderValueNormalized * stepsInRange;
-  // const roundedStepsMin = Math.floor(stepsFromMin);
-  // const minValue = min + roundedStepsMin * step;
-
-  // const maxSliderValueNormalized = maxPositionValue / maxSliderWidth;
-  // const stepsFromMax = maxSliderValueNormalized * stepsInRange;
-  // const roundedStepsMax = Math.floor(stepsFromMax);
-  // const maxValue = min + roundedStepsMax * step;
-
-  // return {min: minValue, max: maxValue};
   const {min, max, step, minPositionValue, maxPositionValue, maxSliderWidth} = options;
   
   // Round to nearest frame
@@ -104,62 +89,6 @@ const AudioTrimTimelineFun: FC<Props> = ({
 }) => {
   const minPosition = useSharedValue(0);
   const maxPosition = useSharedValue(sliderWidth);
-
-  // const gestureHandlerMin = useAnimatedGestureHandler({
-  //   onStart(evt, ctx: {startX: number}) {
-  //     ctx.startX = minPosition.value;
-  //   },
-  //   onActive(evt, ctx) {
-  //     const combinedPosition = ctx.startX + evt.translationX;
-  //     const minClamp = 0;
-  //     const maxClamp = maxPosition.value - 50;
-  //     minPosition.value = Math.max(
-  //       minClamp,
-  //       Math.min(combinedPosition, maxClamp),
-  //     );
-  //   },
-  //   onEnd() {
-  //     const values = calculateMinMaxValue({
-  //       min,
-  //       max,
-  //       minPositionValue: minPosition.value,
-  //       maxPositionValue: maxPosition.value,
-  //       step,
-  //       maxSliderWidth: sliderWidth,
-  //     });
-
-  //     runOnJS(onChangeHandler)(values);
-  //   },
-  // });
-
-  // To Handle Gesture for Max
-  // const gestureHandlerMax = useAnimatedGestureHandler({
-  //   onStart(evt, ctx: {startX: number}) {
-  //     ctx.startX = maxPosition.value;
-  //   },
-  //   onActive(evt, ctx) {
-  //     const combinedPosition = ctx.startX + evt.translationX;
-  //     const minClamp = minPosition.value + 50;
-  //     const maxClamp = sliderWidth;
-
-  //     maxPosition.value = Math.max(
-  //       minClamp,
-  //       Math.min(combinedPosition, maxClamp),
-  //     );
-  //   },
-  //   onEnd() {
-  //     const values = calculateMinMaxValue({
-  //       min,
-  //       max,
-  //       minPositionValue: minPosition.value,
-  //       maxPositionValue: maxPosition.value,
-  //       step,
-  //       maxSliderWidth: sliderWidth,
-  //     });
-
-  //     runOnJS(onChangeHandler)(values);
-  //   },
-  // });
 
   const gestureHandlerMin = useAnimatedGestureHandler({
     onStart(evt, ctx: {startX: number}) {
@@ -263,10 +192,10 @@ const AudioTrimTimelineFun: FC<Props> = ({
           </Animated.View>
         </PanGestureHandler>
       </ScrollView>
-      <View style={styles.timestampContainer}>
+      {/* <View style={styles.timestampContainer}>
         <Text style={styles.timestamps}>{timestampStart}</Text>
         <Text style={styles.timestamps}>{timestampEnd}</Text>
-      </View>
+      </View> */}
     </GestureHandlerRootView>
   );
 };

@@ -18,7 +18,7 @@ import rnfs from 'react-native-fs';
 import {FFmpegKit} from 'ffmpeg-kit-react-native';
 import Icon from 'react-native-vector-icons/Entypo';
 import AntIcon from 'react-native-vector-icons/AntDesign';
-import {VideoUtils} from './services/VideoUtils';
+import {formatVideoTime, VideoUtils} from './services/VideoUtils';
 import {Frame} from './types';
 import AudioTrimTimelineFun from './components/AudioTrimTimelineFun';
 import FramePicks from './components/FramePicks';
@@ -523,110 +523,118 @@ const VideoClip = () => {
             onProgress={onProgress}
             repeat={false}
           />
+          <View style={styles.videoTimeContainer}>
+            <Text style={styles.videoTimeText}>
+              {formatVideoTime(currentTime)} / {formatVideoTime(duration)}
+            </Text>
+          </View>
           <View style={styles.timelineContainer}>
-            <TouchableOpacity
-              style={styles.playButton}
-              onPress={togglePlayPause}>
-              {isPlaying ? (
-                <Icon name={'controller-paus'} size={24} color="white" />
-              ) : (
-                <Icon name={'controller-play'} size={24} color="white" />
-              )}
-            </TouchableOpacity>
-            <View style={styles.timeIndicator}>
-              <Text style={styles.timeText}>{formatTime(currentTime)}</Text>
+            <View style={styles.playButtonContainer}>
+              <TouchableOpacity
+                style={styles.playButton}
+                onPress={togglePlayPause}>
+                {isPlaying ? (
+                  <Icon name={'controller-paus'} size={24} color="white" />
+                ) : (
+                  <Icon name={'controller-play'} size={24} color="white" />
+                )}
+              </TouchableOpacity>
             </View>
-            <View style={styles.centerLine} />
-            <ScrollView
-              ref={scrollViewRef}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.framesContainer}
-              onScroll={handleScroll}
-              onScrollBeginDrag={() => {
-                setIsPlaying(false);
-                isUserScrolling.current = true;
-              }}
-              onScrollEndDrag={() => {
-                setTimeout(() => {
-                  isUserScrolling.current = false;
-                }, 50);
-              }}
-              scrollEventThrottle={16}
-              removeClippedSubviews={true}
-              decelerationRate="fast">
-              <View style={{width: TIMELINE_CENTER}} />
-              {isGeneratingFrames ? (
-                <View style={styles.loadingContainer}>
-                  <ActivityIndicator color="#fff" />
-                  <Text style={styles.loadingText}>
-                    Generating frames...{' '}
-                    {Math.round(frameGenerationProgress * 100)}%
-                  </Text>
-                </View>
-              ) : (
-                <TouchableOpacity
-                  style={[styles.framesWrapper, {position: 'relative'}]}>
-                  {renderSplitMarkers()}
-                  {!isSplitSelecting ? (
-                    <FramePicks
-                      data={frames}
-                      splitPoints={splitPoints}
-                      onRemoveSplit={id =>
-                        setSplitPoints(prev => prev.filter(p => p.id !== id))
-                      }
-                      formatTime={formatTime}
-                      isCropping={isCropping}
-                      value={value}
-                    />
-                  ) : (
-                    <View style={styles.trimmerContainer}>
-                      <AudioTrimTimelineFun
-                        min={0}
-                        max={frames.length - 1}
-                        step={1}
-                        timestampStart={frameToTimestamp(
-                          value.min,
-                          frames.length,
-                          duration,
-                        )}
-                        timestampEnd={frameToTimestamp(
-                          value.max,
-                          frames.length,
-                          duration,
-                        )}
-                        sliderWidth={frames.length * FRAME_WIDTH - 20}
-                        onChangeHandler={handleValueChange}
-                        renderRails={() => (
-                          <FramePicks
-                            data={frames}
-                            splitPoints={splitPoints}
-                            onRemoveSplit={id =>
-                              setSplitPoints(prev =>
-                                prev.filter(p => p.id !== id),
-                              )
-                            }
-                            formatTime={formatTime}
-                            isCropping={isCropping}
-                            value={value}
-                          />
-                        )}
-                      />
-                    </View>
-                  )}
-                </TouchableOpacity>
-              )}
-              <View style={{width: TIMELINE_CENTER}} />
-            </ScrollView>
-            <View style={styles.timeRulerContainer}>
-              <TimeRuler
-                duration={duration}
-                width={frames.length * FRAME_WIDTH}
-              />
-            </View>
-
-            <View style={styles.additionalBarsContainer}>
+            <View style={styles.contentContainer}>
+              <View style={styles.centerLine} />
               <AdditionalBars />
+              <View style={styles.frameBarContainer}>
+                <ScrollView
+                  ref={scrollViewRef}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.framesContainer}
+                  onScroll={handleScroll}
+                  onScrollBeginDrag={() => {
+                    setIsPlaying(false);
+                    isUserScrolling.current = true;
+                  }}
+                  onScrollEndDrag={() => {
+                    setTimeout(() => {
+                      isUserScrolling.current = false;
+                    }, 50);
+                  }}
+                  scrollEventThrottle={16}
+                  removeClippedSubviews={true}
+                  decelerationRate="fast">
+                  <View style={{width: TIMELINE_CENTER}} />
+                  {isGeneratingFrames ? (
+                    <View style={styles.loadingContainer}>
+                      <ActivityIndicator color="#fff" />
+                      <Text style={styles.loadingText}>
+                        Generating frames...{' '}
+                        {Math.round(frameGenerationProgress * 100)}%
+                      </Text>
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      style={[styles.framesWrapper, {position: 'relative'}]}>
+                      {renderSplitMarkers()}
+                      {!isSplitSelecting ? (
+                        <FramePicks
+                          data={frames}
+                          splitPoints={splitPoints}
+                          onRemoveSplit={id =>
+                            setSplitPoints(prev =>
+                              prev.filter(p => p.id !== id),
+                            )
+                          }
+                          formatTime={formatTime}
+                          isCropping={isCropping}
+                          value={value}
+                        />
+                      ) : (
+                        <View style={styles.trimmerContainer}>
+                          <AudioTrimTimelineFun
+                            min={0}
+                            max={frames.length - 1}
+                            step={1}
+                            timestampStart={frameToTimestamp(
+                              value.min,
+                              frames.length,
+                              duration,
+                            )}
+                            timestampEnd={frameToTimestamp(
+                              value.max,
+                              frames.length,
+                              duration,
+                            )}
+                            sliderWidth={frames.length * FRAME_WIDTH - 20}
+                            onChangeHandler={handleValueChange}
+                            renderRails={() => (
+                              <FramePicks
+                                data={frames}
+                                splitPoints={splitPoints}
+                                onRemoveSplit={id =>
+                                  setSplitPoints(prev =>
+                                    prev.filter(p => p.id !== id),
+                                  )
+                                }
+                                formatTime={formatTime}
+                                isCropping={isCropping}
+                                value={value}
+                              />
+                            )}
+                          />
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  )}
+                  <View style={{width: TIMELINE_CENTER}} />
+                </ScrollView>
+                <View style={styles.timeRulerContainer}>
+                  <TimeRuler
+                    duration={duration}
+                    width={frames.length * FRAME_WIDTH}
+                    frameWidth={FRAME_WIDTH}
+                  />
+                </View>
+              </View>
             </View>
           </View>
           <View style={styles.toolsContainer}>
@@ -690,6 +698,53 @@ const VideoClip = () => {
 };
 
 const styles = StyleSheet.create({
+  timeRulerContainer: {
+    position: 'absolute',
+    bottom: -20,
+    left: 0,
+    right: 0,
+    height: 20,
+    overflow: 'hidden',
+  },
+  timelineContainer: {
+    flex: 1,
+    backgroundColor: '#000',
+  },
+  playButtonContainer: {
+    alignItems: 'center',
+    paddingVertical: 15,
+  },
+  contentContainer: {
+    flex: 1,
+    position: 'relative',
+  },
+  centerLine: {
+    position: 'absolute',
+    left: '50%',
+    top: 0,
+    bottom: 0,
+    width: 2,
+    backgroundColor: '#fff',
+    zIndex: 10,
+  },
+  frameBarContainer: {
+    position: 'relative',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 70,
+  },
+  framesContainer: {
+    height: FRAME_BAR_HEIGHT,
+  },
+  playButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   videoContainer: {
     flex: 1,
     marginTop: 30,
@@ -698,23 +753,27 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '50%', // Reduced from 60%
   },
-  timelineContainer: {
-    width: '100%',
-    height: 300, // Fixed height for timeline section
-    backgroundColor: '#000',
+  videoTimeContainer: {
+    position: 'absolute',
+    bottom: 10,
+    right: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  videoTimeText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '500',
   },
   framesSection: {
-    height: 120, // Height for frames area including time indicator
+    height: 120,
   },
-  framesContainer: {
-    height: FRAME_BAR_HEIGHT,
-    marginTop: TIME_INDICATOR_HEIGHT,
-    alignSelf: 'center',
-  },
-  timeRulerContainer: {
-    height: 30,
-    backgroundColor: '#000',
-  },
+  // timeRulerContainer: {
+  //   height: 30,
+  //   backgroundColor: '#000',
+  // },
   additionalBarsContainer: {
     marginTop: 10,
   },
@@ -722,14 +781,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#000',
   },
-  // videoContainer: {
-  //   flex: 1,
-  //   marginTop: 30,
-  // },
-  // video: {
-  //   width: '100%',
-  //   height: '60%',
-  // },
   backButton: {
     position: 'absolute',
     left: 20,
@@ -744,7 +795,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 20,
     zIndex: 10,
-    // backgroundColor: '#fff',
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 20,
@@ -756,14 +806,6 @@ const styles = StyleSheet.create({
     color: '#000',
     fontSize: 16,
     fontWeight: 'bold',
-  },
-  playButton: {
-    alignSelf: 'center',
-    paddingVertical: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 10,
   },
   playButtonText: {
     color: '#fff',
@@ -787,15 +829,15 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: 'bold',
   },
-  centerLine: {
-    position: 'absolute',
-    left: TIMELINE_CENTER,
-    top: 70,
-    width: 2,
-    height: FRAME_BAR_HEIGHT,
-    backgroundColor: '#fff',
-    zIndex: 10,
-  },
+  // centerLine: {
+  //   position: 'absolute',
+  //   left: TIMELINE_CENTER,
+  //   top: 70,
+  //   width: 2,
+  //   height: FRAME_BAR_HEIGHT,
+  //   backgroundColor: '#fff',
+  //   zIndex: 10,
+  // },
   // framesContainer: {
   //   height: FRAME_BAR_HEIGHT,
   //   marginTop: TIME_INDICATOR_HEIGHT,
@@ -1067,7 +1109,7 @@ const styles = StyleSheet.create({
     height: FRAME_BAR_HEIGHT,
     position: 'relative',
     marginRight: 1,
-    overflow: 'hidden', 
+    overflow: 'hidden',
   },
   trimSelection: {
     borderColor: '#fff',
