@@ -10,7 +10,6 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
 } from 'react-native-reanimated';
-import Icon from 'react-native-vector-icons/Entypo';
 
 interface Props {
   min: number;
@@ -33,24 +32,26 @@ const Thumb = ({side}: ThumbProps) => {
       ? {borderTopLeftRadius: 10, borderBottomLeftRadius: 10}
       : {borderTopRightRadius: 10, borderBottomRightRadius: 10};
 
-  const iconName = side === 'left' ? 'chevron-left' : 'chevron-right';
-
   return (
     <View
       style={{
-        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+        backgroundColor: 'white',
         height: '100%',
+        width: '40%',
         justifyContent: 'center',
-        transform: [{translateX: side === 'left' ? -10 : 10}],
+        alignItems: 'center',
+        // transform: [{translateX: side === 'left' ? -10 : 10}],
         ...borderRadius,
       }}>
-      <Icon name={iconName} size={24} color="white" />
+      <View style={{borderWidth: 1.2, height: 15, borderRadius: 5}} />
     </View>
   );
 };
 
 export const AUDIO_TRIM_SLIDER_HEIGHT = 50;
 export const AUDIO_TRIM_SLIDER_PICK_HEIGHT = 50;
+const THUMB_WIDTH = 3;
+const FRAME_SNAP_THRESHOLD = 1;
 
 type calculateMinMaxOptions = {
   minPositionValue: number;
@@ -63,19 +64,30 @@ type calculateMinMaxOptions = {
 
 const calculateMinMaxValue = (options: calculateMinMaxOptions) => {
   'worklet';
-  const {min, max, step, minPositionValue, maxPositionValue, maxSliderWidth} =
-    options;
+  // const {min, max, step, minPositionValue, maxPositionValue, maxSliderWidth} =
+  //   options;
 
-  const minSliderValueNormalized = minPositionValue / maxSliderWidth;
+  // const minSliderValueNormalized = minPositionValue / maxSliderWidth;
+  // const stepsInRange = (max - min) / step;
+  // const stepsFromMin = minSliderValueNormalized * stepsInRange;
+  // const roundedStepsMin = Math.floor(stepsFromMin);
+  // const minValue = min + roundedStepsMin * step;
+
+  // const maxSliderValueNormalized = maxPositionValue / maxSliderWidth;
+  // const stepsFromMax = maxSliderValueNormalized * stepsInRange;
+  // const roundedStepsMax = Math.floor(stepsFromMax);
+  // const maxValue = min + roundedStepsMax * step;
+
+  // return {min: minValue, max: maxValue};
+  const {min, max, step, minPositionValue, maxPositionValue, maxSliderWidth} = options;
+  
+  // Round to nearest frame
+  const minSliderValueNormalized = Math.round(minPositionValue / step) * step / maxSliderWidth;
+  const maxSliderValueNormalized = Math.round(maxPositionValue / step) * step / maxSliderWidth;
+
   const stepsInRange = (max - min) / step;
-  const stepsFromMin = minSliderValueNormalized * stepsInRange;
-  const roundedStepsMin = Math.floor(stepsFromMin);
-  const minValue = min + roundedStepsMin * step;
-
-  const maxSliderValueNormalized = maxPositionValue / maxSliderWidth;
-  const stepsFromMax = maxSliderValueNormalized * stepsInRange;
-  const roundedStepsMax = Math.floor(stepsFromMax);
-  const maxValue = min + roundedStepsMax * step;
+  const minValue = min + Math.round(minSliderValueNormalized * stepsInRange) * step;
+  const maxValue = min + Math.round(maxSliderValueNormalized * stepsInRange) * step;
 
   return {min: minValue, max: maxValue};
 };
@@ -93,7 +105,62 @@ const AudioTrimTimelineFun: FC<Props> = ({
   const minPosition = useSharedValue(0);
   const maxPosition = useSharedValue(sliderWidth);
 
-  // To Handle Gesture for Min
+  // const gestureHandlerMin = useAnimatedGestureHandler({
+  //   onStart(evt, ctx: {startX: number}) {
+  //     ctx.startX = minPosition.value;
+  //   },
+  //   onActive(evt, ctx) {
+  //     const combinedPosition = ctx.startX + evt.translationX;
+  //     const minClamp = 0;
+  //     const maxClamp = maxPosition.value - 50;
+  //     minPosition.value = Math.max(
+  //       minClamp,
+  //       Math.min(combinedPosition, maxClamp),
+  //     );
+  //   },
+  //   onEnd() {
+  //     const values = calculateMinMaxValue({
+  //       min,
+  //       max,
+  //       minPositionValue: minPosition.value,
+  //       maxPositionValue: maxPosition.value,
+  //       step,
+  //       maxSliderWidth: sliderWidth,
+  //     });
+
+  //     runOnJS(onChangeHandler)(values);
+  //   },
+  // });
+
+  // To Handle Gesture for Max
+  // const gestureHandlerMax = useAnimatedGestureHandler({
+  //   onStart(evt, ctx: {startX: number}) {
+  //     ctx.startX = maxPosition.value;
+  //   },
+  //   onActive(evt, ctx) {
+  //     const combinedPosition = ctx.startX + evt.translationX;
+  //     const minClamp = minPosition.value + 50;
+  //     const maxClamp = sliderWidth;
+
+  //     maxPosition.value = Math.max(
+  //       minClamp,
+  //       Math.min(combinedPosition, maxClamp),
+  //     );
+  //   },
+  //   onEnd() {
+  //     const values = calculateMinMaxValue({
+  //       min,
+  //       max,
+  //       minPositionValue: minPosition.value,
+  //       maxPositionValue: maxPosition.value,
+  //       step,
+  //       maxSliderWidth: sliderWidth,
+  //     });
+
+  //     runOnJS(onChangeHandler)(values);
+  //   },
+  // });
+
   const gestureHandlerMin = useAnimatedGestureHandler({
     onStart(evt, ctx: {startX: number}) {
       ctx.startX = minPosition.value;
@@ -101,11 +168,11 @@ const AudioTrimTimelineFun: FC<Props> = ({
     onActive(evt, ctx) {
       const combinedPosition = ctx.startX + evt.translationX;
       const minClamp = 0;
-      const maxClamp = maxPosition.value - 50;
-      minPosition.value = Math.max(
-        minClamp,
-        Math.min(combinedPosition, maxClamp),
-      );
+      const maxClamp = maxPosition.value - 3; // Update to match thumb width
+
+      // Snap to frames
+      const frameSnap = Math.round(combinedPosition / step) * step;
+      minPosition.value = Math.max(minClamp, Math.min(frameSnap, maxClamp));
     },
     onEnd() {
       const values = calculateMinMaxValue({
@@ -116,7 +183,32 @@ const AudioTrimTimelineFun: FC<Props> = ({
         step,
         maxSliderWidth: sliderWidth,
       });
+      runOnJS(onChangeHandler)(values);
+    },
+  });
 
+  const gestureHandlerMax = useAnimatedGestureHandler({
+    onStart(evt, ctx: {startX: number}) {
+      ctx.startX = maxPosition.value;
+    },
+    onActive(evt, ctx) {
+      const combinedPosition = ctx.startX + evt.translationX;
+      const minClamp = minPosition.value + 3; // Update to match thumb width
+      const maxClamp = sliderWidth;
+
+      // Snap to frames
+      const frameSnap = Math.round(combinedPosition / step) * step;
+      maxPosition.value = Math.max(minClamp, Math.min(frameSnap, maxClamp));
+    },
+    onEnd() {
+      const values = calculateMinMaxValue({
+        min,
+        max,
+        minPositionValue: minPosition.value,
+        maxPositionValue: maxPosition.value,
+        step,
+        maxSliderWidth: sliderWidth,
+      });
       runOnJS(onChangeHandler)(values);
     },
   });
@@ -125,35 +217,6 @@ const AudioTrimTimelineFun: FC<Props> = ({
     return {
       transform: [{translateX: minPosition.value}],
     };
-  });
-
-  // To Handle Gesture for Max
-  const gestureHandlerMax = useAnimatedGestureHandler({
-    onStart(evt, ctx: {startX: number}) {
-      ctx.startX = maxPosition.value;
-    },
-    onActive(evt, ctx) {
-      const combinedPosition = ctx.startX + evt.translationX;
-      const minClamp = minPosition.value + 50;
-      const maxClamp = sliderWidth;
-
-      maxPosition.value = Math.max(
-        minClamp,
-        Math.min(combinedPosition, maxClamp),
-      );
-    },
-    onEnd() {
-      const values = calculateMinMaxValue({
-        min,
-        max,
-        minPositionValue: minPosition.value,
-        maxPositionValue: maxPosition.value,
-        step,
-        maxSliderWidth: sliderWidth,
-      });
-
-      runOnJS(onChangeHandler)(values);
-    },
   });
 
   const animatedStyleMax = useAnimatedStyle(() => {
@@ -188,16 +251,14 @@ const AudioTrimTimelineFun: FC<Props> = ({
           </Animated.View>
         </Animated.View>
 
-        {/* Thumb Left */}
         <PanGestureHandler onGestureEvent={gestureHandlerMin}>
-          <Animated.View style={[animatedStyleMin, {...styles.thumb, left: -0}]}>
+          <Animated.View style={[animatedStyleMin, styles.thumb]}>
             <Thumb side="left" />
           </Animated.View>
         </PanGestureHandler>
 
-        {/* Thumb Right */}
         <PanGestureHandler onGestureEvent={gestureHandlerMax}>
-          <Animated.View style={[styles.thumb, animatedStyleMax]}>
+          <Animated.View style={[styles.thumb2, animatedStyleMax]}>
             <Thumb side="right" />
           </Animated.View>
         </PanGestureHandler>
@@ -235,12 +296,23 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: '50%',
     overflow: 'hidden',
+    borderTopColor: 'white',
+    borderTopWidth: 2,
+    borderBottomColor: 'white',
+    borderBottomWidth: 2,
   },
   thumb: {
-    left: -THUMB_SIZE,
+    left: -0,
     width: THUMB_SIZE,
     height: THUMB_SIZE,
-    backgroundColor: 'transparent',
+    position: 'absolute',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  thumb2: {
+    left: -50,
+    width: THUMB_SIZE,
+    height: THUMB_SIZE,
     position: 'absolute',
     justifyContent: 'center',
     alignItems: 'center',

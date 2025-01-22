@@ -17,11 +17,15 @@ import {useSharedValue} from 'react-native-reanimated';
 import rnfs from 'react-native-fs';
 import {FFmpegKit} from 'ffmpeg-kit-react-native';
 import Icon from 'react-native-vector-icons/Entypo';
+import AntIcon from 'react-native-vector-icons/AntDesign';
 import {VideoUtils} from './services/VideoUtils';
 import {Frame} from './types';
 import AudioTrimTimelineFun from './components/AudioTrimTimelineFun';
 import FramePicks from './components/FramePicks';
 import {trimVideo} from './FrameTrim';
+import {ScissorIcon, SplitIcon, TrashIcon} from './utils/images';
+import TimeRuler from './components/TimeRuler';
+import AdditionalBars from './components/AddtionalBars';
 
 // Constants
 const {width: SCREEN_WIDTH} = Dimensions.get('window');
@@ -490,20 +494,22 @@ const VideoClip = () => {
 
   return (
     <GestureHandlerRootView style={styles.container}>
-      <TouchableOpacity
-        style={styles.backButton}
-        onPress={() => resetVideoState()}>
-        <Icon name={'cross'} size={24} color="white" />
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={[
-          styles.nextButton,
-          (!isCropping || isProcessing) && styles.toolDisabled,
-        ]}
-        onPress={() => handleSaveVideoSections()}
-        disabled={!isCropping || isProcessing}>
-        <Text style={styles.toolText2}>Save</Text>
-      </TouchableOpacity>
+      <View>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => resetVideoState()}>
+          <AntIcon name={'close'} size={24} color="white" />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.nextButton,
+            (!isCropping || isProcessing) && styles.toolDisabled,
+          ]}
+          onPress={() => handleSaveVideoSections()}
+          disabled={!isCropping || isProcessing}>
+          <AntIcon name={'check'} size={24} color="white" />
+        </TouchableOpacity>
+      </View>
 
       {videoUri ? (
         <View style={styles.videoContainer}>
@@ -540,7 +546,6 @@ const VideoClip = () => {
               onScrollBeginDrag={() => {
                 setIsPlaying(false);
                 isUserScrolling.current = true;
-                // PerformanceEntry;
               }}
               onScrollEndDrag={() => {
                 setTimeout(() => {
@@ -592,17 +597,6 @@ const VideoClip = () => {
                         )}
                         sliderWidth={frames.length * FRAME_WIDTH - 20}
                         onChangeHandler={handleValueChange}
-                        handleStyle={{
-                          width: 4,
-                          height: FRAME_BAR_HEIGHT,
-                          backgroundColor: '#fff',
-                          borderRadius: 0,
-                        }}
-                        railStyle={{
-                          borderColor: '#fff',
-                          borderWidth: 2,
-                          backgroundColor: 'transparent',
-                        }}
                         renderRails={() => (
                           <FramePicks
                             data={frames}
@@ -624,17 +618,18 @@ const VideoClip = () => {
               )}
               <View style={{width: TIMELINE_CENTER}} />
             </ScrollView>
+            <View style={styles.timeRulerContainer}>
+              <TimeRuler
+                duration={duration}
+                width={frames.length * FRAME_WIDTH}
+              />
+            </View>
+
+            <View style={styles.additionalBarsContainer}>
+              <AdditionalBars />
+            </View>
           </View>
           <View style={styles.toolsContainer}>
-            <TouchableOpacity
-              style={[styles.tool, isProcessing && styles.toolDisabled]}
-              onPress={() => {
-                setIsCropping(true);
-                setIsSplitSelecting(true);
-              }}
-              disabled={isProcessing || isGeneratingFrames}>
-              <Text style={styles.toolText}>Trim</Text>
-            </TouchableOpacity>
             <TouchableOpacity
               style={[
                 styles.tool,
@@ -649,16 +644,18 @@ const VideoClip = () => {
                 }
               }}
               disabled={isProcessing || isGeneratingFrames || isCropping}>
+              <SplitIcon height={25} width={25} />
               <Text style={styles.toolText}>Split</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[
-                styles.tool,
-                (isProcessing || !splitPoints.length) && styles.toolDisabled,
-              ]}
-              onPress={() => setSplitPoints([])}
-              disabled={isProcessing || !splitPoints.length}>
-              <Text style={styles.toolText}>Clear</Text>
+              style={[styles.tool, isProcessing && styles.toolDisabled]}
+              onPress={() => {
+                setIsCropping(true);
+                setIsSplitSelecting(true);
+              }}
+              disabled={isProcessing || isGeneratingFrames}>
+              <ScissorIcon height={25} width={25} />
+              <Text style={styles.toolText}>Trim</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.tool, isProcessing && styles.toolDisabled]}
@@ -667,6 +664,7 @@ const VideoClip = () => {
                 setIsSplitSelecting(false);
                 setIsCropping(false);
               }}>
+              <TrashIcon height={25} width={25} />
               <Text style={styles.toolText}>Delete</Text>
             </TouchableOpacity>
           </View>
@@ -692,20 +690,48 @@ const VideoClip = () => {
 };
 
 const styles = StyleSheet.create({
+  videoContainer: {
+    flex: 1,
+    marginTop: 30,
+  },
+  video: {
+    width: '100%',
+    height: '50%', // Reduced from 60%
+  },
+  timelineContainer: {
+    width: '100%',
+    height: 300, // Fixed height for timeline section
+    backgroundColor: '#000',
+  },
+  framesSection: {
+    height: 120, // Height for frames area including time indicator
+  },
+  framesContainer: {
+    height: FRAME_BAR_HEIGHT,
+    marginTop: TIME_INDICATOR_HEIGHT,
+    alignSelf: 'center',
+  },
+  timeRulerContainer: {
+    height: 30,
+    backgroundColor: '#000',
+  },
+  additionalBarsContainer: {
+    marginTop: 10,
+  },
   container: {
     flex: 1,
     backgroundColor: '#000',
   },
-  videoContainer: {
-    flex: 1,
-  },
-  video: {
-    width: '100%',
-    height: '70%',
-  },
+  // videoContainer: {
+  //   flex: 1,
+  //   marginTop: 30,
+  // },
+  // video: {
+  //   width: '100%',
+  //   height: '60%',
+  // },
   backButton: {
     position: 'absolute',
-    top: 20,
     left: 20,
     zIndex: 10,
     padding: 10,
@@ -716,10 +742,9 @@ const styles = StyleSheet.create({
   },
   nextButton: {
     position: 'absolute',
-    top: 20,
     right: 20,
     zIndex: 10,
-    backgroundColor: '#fff',
+    // backgroundColor: '#fff',
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 20,
@@ -745,7 +770,6 @@ const styles = StyleSheet.create({
     fontSize: 28,
     opacity: 0.9,
   },
-
   timeIndicator: {
     position: 'absolute',
     top: 50,
@@ -768,15 +792,15 @@ const styles = StyleSheet.create({
     left: TIMELINE_CENTER,
     top: 70,
     width: 2,
-    height: FRAME_BAR_HEIGHT * 2.25,
+    height: FRAME_BAR_HEIGHT,
     backgroundColor: '#fff',
     zIndex: 10,
   },
-  framesContainer: {
-    height: FRAME_BAR_HEIGHT,
-    marginTop: TIME_INDICATOR_HEIGHT,
-    alignSelf: 'center',
-  },
+  // framesContainer: {
+  //   height: FRAME_BAR_HEIGHT,
+  //   marginTop: TIME_INDICATOR_HEIGHT,
+  //   alignSelf: 'center',
+  // },
   frameImage: {
     width: FRAME_WIDTH,
     height: FRAME_BAR_HEIGHT,
@@ -829,22 +853,24 @@ const styles = StyleSheet.create({
   },
   toolsContainer: {
     flexDirection: 'row',
-    width: '100%',
-    height: 40,
+    // width: '100%',
+    paddingHorizontal: 100,
+    height: 60,
     backgroundColor: '#222',
     justifyContent: 'space-around',
     alignItems: 'center',
   },
   tool: {
-    padding: 10,
+    padding: 20,
+    alignItems: 'center',
   },
   toolDisabled: {
     opacity: 0.5,
   },
   toolText: {
     color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: 14,
+    fontFamily: 'bold',
   },
   toolText2: {
     color: '#000',
@@ -1024,11 +1050,11 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginLeft: -30,
   },
-  timelineContainer: {
-    width: '100%',
-    flex: 1,
-    backgroundColor: '#000',
-  },
+  // timelineContainer: {
+  //   width: '100%',
+  //   flex: 1,
+  //   backgroundColor: '#000',
+  // },
   progressLine: {
     position: 'absolute',
     top: 0,
@@ -1041,7 +1067,7 @@ const styles = StyleSheet.create({
     height: FRAME_BAR_HEIGHT,
     position: 'relative',
     marginRight: 1,
-    overflow: 'hidden', // This will keep frame content within bounds
+    overflow: 'hidden', 
   },
   trimSelection: {
     borderColor: '#fff',
