@@ -1,4 +1,3 @@
-// AdditionalBars.tsx
 import React from 'react';
 import {View, Text, StyleSheet} from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -17,7 +16,6 @@ const AdditionalBars = () => {
         <View key={index} style={styles.barRow}>
           <View style={styles.leftSection}>
             {bar.icon}
-            {/* <Icon name={bar.icon} size={24} color="#666" /> */}
           </View>
           <View style={styles.rightSection}>
             <Text style={styles.text}>{bar.text}</Text>

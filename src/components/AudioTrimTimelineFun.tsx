@@ -1,4 +1,6 @@
-import {FC} from 'react';
+import React from 'react';
+import {FC, useRef} from 'react';
+import {NativeScrollEvent, NativeSyntheticEvent} from 'react-native';
 import {View, StyleSheet, ScrollView, Text} from 'react-native';
 import {
   GestureHandlerRootView,
@@ -20,10 +22,21 @@ interface Props {
   sliderWidth: number;
   renderRails(): JSX.Element;
   onChangeHandler(values: {min: number; max: number}): void;
+  data: Frame[];
+  isHandlesVisible?: boolean;
+}
+
+interface Frame {
+  uri: string;
 }
 
 interface ThumbProps {
   side: 'left' | 'right';
+}
+
+interface TimeRulerProps {
+  index: number;
+  totalFrames: number;
 }
 
 const Thumb = ({side}: ThumbProps) => {
@@ -40,7 +53,6 @@ const Thumb = ({side}: ThumbProps) => {
         width: '40%',
         justifyContent: 'center',
         alignItems: 'center',
-        // transform: [{translateX: side === 'left' ? -10 : 10}],
         ...borderRadius,
       }}>
       <View style={{borderWidth: 1.2, height: 15, borderRadius: 5}} />
@@ -50,8 +62,7 @@ const Thumb = ({side}: ThumbProps) => {
 
 export const AUDIO_TRIM_SLIDER_HEIGHT = 50;
 export const AUDIO_TRIM_SLIDER_PICK_HEIGHT = 50;
-const THUMB_WIDTH = 3;
-const FRAME_SNAP_THRESHOLD = 1;
+const FRAME_WIDTH = 50;
 
 type calculateMinMaxOptions = {
   minPositionValue: number;
@@ -64,16 +75,17 @@ type calculateMinMaxOptions = {
 
 const calculateMinMaxValue = (options: calculateMinMaxOptions) => {
   'worklet';
-  const {min, max, step, minPositionValue, maxPositionValue, maxSliderWidth} = options;
-  
-  // Round to nearest frame
-  const minSliderValueNormalized = Math.round(minPositionValue / step) * step / maxSliderWidth;
-  const maxSliderValueNormalized = Math.round(maxPositionValue / step) * step / maxSliderWidth;
-
+  const {min, max, step, minPositionValue, maxPositionValue, maxSliderWidth} =
+    options;
+  const minSliderValueNormalized =
+    (Math.round(minPositionValue / step) * step) / maxSliderWidth;
+  const maxSliderValueNormalized =
+    (Math.round(maxPositionValue / step) * step) / maxSliderWidth;
   const stepsInRange = (max - min) / step;
-  const minValue = min + Math.round(minSliderValueNormalized * stepsInRange) * step;
-  const maxValue = min + Math.round(maxSliderValueNormalized * stepsInRange) * step;
-
+  const minValue =
+    min + Math.round(minSliderValueNormalized * stepsInRange) * step;
+  const maxValue =
+    min + Math.round(maxSliderValueNormalized * stepsInRange) * step;
   return {min: minValue, max: maxValue};
 };
 
@@ -82,13 +94,45 @@ const AudioTrimTimelineFun: FC<Props> = ({
   min,
   max,
   step,
-  timestampEnd,
-  timestampStart,
   renderRails,
   onChangeHandler,
+  data,
+  isHandlesVisible = true,
 }) => {
   const minPosition = useSharedValue(0);
   const maxPosition = useSharedValue(sliderWidth);
+  const mainScrollRef = useRef<ScrollView>(null);
+  const rulerScrollRef = useRef<ScrollView>(null);
+  const isMainScrolling = useRef(false);
+  const isRulerScrolling = useRef(false);
+
+  const handleMainScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (!isRulerScrolling.current && rulerScrollRef.current) {
+      isMainScrolling.current = true;
+      rulerScrollRef.current.scrollTo({
+        x: event.nativeEvent.contentOffset.x,
+        animated: false,
+      });
+      setTimeout(() => {
+        isMainScrolling.current = false;
+      }, 50);
+    }
+  };
+
+  const handleRulerScroll = (
+    event: NativeSyntheticEvent<NativeScrollEvent>,
+  ) => {
+    if (!isMainScrolling.current && mainScrollRef.current) {
+      isRulerScrolling.current = true;
+      mainScrollRef.current.scrollTo({
+        x: event.nativeEvent.contentOffset.x,
+        animated: false,
+      });
+      setTimeout(() => {
+        isRulerScrolling.current = false;
+      }, 50);
+    }
+  };
 
   const gestureHandlerMin = useAnimatedGestureHandler({
     onStart(evt, ctx: {startX: number}) {
@@ -122,10 +166,8 @@ const AudioTrimTimelineFun: FC<Props> = ({
     },
     onActive(evt, ctx) {
       const combinedPosition = ctx.startX + evt.translationX;
-      const minClamp = minPosition.value + 3; // Update to match thumb width
+      const minClamp = minPosition.value + 3;
       const maxClamp = sliderWidth;
-
-      // Snap to frames
       const frameSnap = Math.round(combinedPosition / step) * step;
       maxPosition.value = Math.max(minClamp, Math.min(frameSnap, maxClamp));
     },
@@ -144,13 +186,13 @@ const AudioTrimTimelineFun: FC<Props> = ({
 
   const animatedStyleMin = useAnimatedStyle(() => {
     return {
-      transform: [{translateX: minPosition.value}],
+      transform: [{translateX: minPosition.value - 15}],
     };
   });
 
   const animatedStyleMax = useAnimatedStyle(() => {
     return {
-      transform: [{translateX: maxPosition.value}],
+      transform: [{translateX: maxPosition.value + 15}],
     };
   });
 
@@ -167,35 +209,72 @@ const AudioTrimTimelineFun: FC<Props> = ({
     };
   });
 
+  const TimeRulerMark: React.FC<TimeRulerProps> = ({index}) => {
+    const formatTimeForRuler = (seconds: number) => {
+      return `${Math.floor(seconds / 60)}:${(seconds % 60)
+        .toString()
+        .padStart(2, '0')}`;
+    };
+    return (
+      <View style={styles.timeRulerMark}>
+        <Text style={styles.timeRulerText}>
+          {formatTimeForRuler(Math.floor(index))}
+        </Text>
+      </View>
+    );
+  };
+
+  console.log('handle visible', isHandlesVisible);
+
   return (
     <GestureHandlerRootView style={styles.container}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        ref={mainScrollRef}
+        onScroll={handleMainScroll}>
         <View style={[styles.inactiveRailSlider, {width: sliderWidth}]}>
           {renderRails()}
         </View>
-
         <Animated.View style={[sliderStyle, styles.activeRailSlider]}>
           <Animated.View style={[innerSliderStyle, styles.trimmedArea]}>
             {renderRails()}
           </Animated.View>
         </Animated.View>
-
-        <PanGestureHandler onGestureEvent={gestureHandlerMin}>
-          <Animated.View style={[animatedStyleMin, styles.thumb]}>
-            <Thumb side="left" />
-          </Animated.View>
-        </PanGestureHandler>
-
-        <PanGestureHandler onGestureEvent={gestureHandlerMax}>
-          <Animated.View style={[styles.thumb2, animatedStyleMax]}>
-            <Thumb side="right" />
-          </Animated.View>
-        </PanGestureHandler>
+        {isHandlesVisible && (
+          <>
+            <PanGestureHandler onGestureEvent={gestureHandlerMin}>
+              <Animated.View style={[animatedStyleMin, styles.thumb]}>
+                <Thumb side="left" />
+              </Animated.View>
+            </PanGestureHandler>
+            <PanGestureHandler onGestureEvent={gestureHandlerMax}>
+              <Animated.View style={[styles.thumb2, animatedStyleMax]}>
+                <Thumb side="right" />
+              </Animated.View>
+            </PanGestureHandler>
+          </>
+        )}
       </ScrollView>
-      {/* <View style={styles.timestampContainer}>
-        <Text style={styles.timestamps}>{timestampStart}</Text>
-        <Text style={styles.timestamps}>{timestampEnd}</Text>
-      </View> */}
+      <ScrollView
+        ref={rulerScrollRef}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        onScroll={handleRulerScroll}
+        scrollEventThrottle={16}
+        style={styles.timeRulerScroll}>
+        <View style={[styles.timeRulerContainer, {width: sliderWidth}]}>
+          {data.map((_, index) => (
+            <View style={styles.timeRulerContainer}>
+              <TimeRulerMark
+                key={index}
+                index={index}
+                totalFrames={data.length}
+              />
+            </View>
+          ))}
+        </View>
+      </ScrollView>
     </GestureHandlerRootView>
   );
 };
@@ -203,13 +282,35 @@ const AudioTrimTimelineFun: FC<Props> = ({
 const THUMB_SIZE = 50;
 
 const styles = StyleSheet.create({
-  container: {flex: 1},
+  timeRulerScroll: {
+    position: 'absolute',
+    bottom: -30,
+    left: 0,
+    right: 0,
+    height: 30,
+  },
+  timeRulerContainer: {
+    flexDirection: 'row',
+    height: 30,
+  },
+  container: {flex: 1,},
   inactiveRailSlider: {
     flexDirection: 'row',
     alignItems: 'center',
     height: AUDIO_TRIM_SLIDER_HEIGHT,
-    backgroundColor: '#DFEAFB',
+    // backgroundColor: '#DFEAFB',
     opacity: 0.3,
+  },
+  timeRulerMark: {
+    width: FRAME_WIDTH,
+    height: 30,
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+  },
+  timeRulerText: {
+    color: 'white',
+    fontSize: 10,
+    textAlign: 'center',
   },
   trimmedArea: {
     flexDirection: 'row',
@@ -221,14 +322,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     height: AUDIO_TRIM_SLIDER_HEIGHT,
-    backgroundColor: 'rgba(0, 0, 200, 0.2)',
+    // backgroundColor: 'rgba(0, 0, 200, 0.2)',
     position: 'absolute',
     width: '50%',
     overflow: 'hidden',
-    borderTopColor: 'white',
-    borderTopWidth: 2,
-    borderBottomColor: 'white',
-    borderBottomWidth: 2,
   },
   thumb: {
     left: -0,

@@ -70,8 +70,6 @@ const VideoTrimTimelineFun: FC<Props> = ({
   min,
   max,
   step,
-  timestampEnd,
-  timestampStart,
   renderRails,
   onChangeHandler,
 }) => {
@@ -150,13 +148,11 @@ const VideoTrimTimelineFun: FC<Props> = ({
           <View style={[styles.inactiveRailSlider, {width: sliderWidth}]}>
             {renderRails()}
           </View>
-
           <Animated.View style={[sliderStyle, styles.activeRailSlider]}>
             <Animated.View style={[innerSliderStyle, styles.trimmedArea]}>
               {renderRails()}
             </Animated.View>
           </Animated.View>
-
           <PanGestureHandler onGestureEvent={gestureHandlerMin}>
             <Animated.View style={[styles.thumbWrapper, animatedStyleMin]}>
               <Thumb side="left" />
@@ -170,11 +166,6 @@ const VideoTrimTimelineFun: FC<Props> = ({
           </PanGestureHandler>
         </View>
       </ScrollView>
-      
-      <View style={styles.timestampContainer}>
-        <Text style={styles.timestamp}>{timestampStart}</Text>
-        <Text style={styles.timestamp}>{timestampEnd}</Text>
-      </View>
     </GestureHandlerRootView>
   );
 };
@@ -202,7 +193,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     height: 40,
-    backgroundColor: 'rgba(0, 0, 200, 0.2)',
+    // backgroundColor: 'rgba(0, 0, 200, 0.2)',
     position: 'absolute',
     overflow: 'hidden',
   },
