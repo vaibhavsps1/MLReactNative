@@ -1,18 +1,7 @@
-import React, {useState} from 'react';
-import {StyleSheet, View, Image, TouchableOpacity, Text} from 'react-native';
+import React, {useState, useCallback, useEffect} from 'react';
+import {StyleSheet, View, Image, TouchableOpacity} from 'react-native';
 import {VideoUtils} from '../services/VideoUtils';
-import {
-  PanGestureHandler,
-  GestureDetector,
-  Gesture,
-} from 'react-native-gesture-handler';
-import Animated, {
-  useAnimatedGestureHandler,
-  useAnimatedStyle,
-  useSharedValue,
-  runOnJS,
-  withSpring,
-} from 'react-native-reanimated';
+import AudioTrimTimelineFun from './AudioTrimTimelineFun';
 
 interface Frame {
   uri: string;
@@ -22,6 +11,27 @@ interface SplitPoint {
   id: string;
   time: number;
   frameIndex: number;
+}
+
+// Add new interfaces for segment tracking
+interface SegmentState {
+  originalStart: number;
+  originalEnd: number;
+  currentStart: number;
+  currentEnd: number;
+  lastModified: number;
+}
+
+interface SegmentHistory {
+  [key: number]: SegmentState;
+}
+
+interface SegmentState {
+  originalStart: number;
+  originalEnd: number;
+  currentStart: number;
+  currentEnd: number;
+  lastModified: number;
 }
 
 interface FramePicksProps {
@@ -47,104 +57,6 @@ interface FramePicksProps {
 const FRAME_BAR_HEIGHT = 50;
 const FRAME_WIDTH = VideoUtils.FRAME_WIDTH;
 const SEGMENT_GAP = 4;
-const HANDLE_WIDTH = 20;
-
-const LeftSegmentHandle = ({
-  onDrag,
-  minBound,
-  maxBound,
-}: {
-  onDrag: (newPosition: number) => void;
-  minBound: number;
-  maxBound: number;
-}) => {
-  const translateX = useSharedValue(0);
-  console.log('this is Active translateX', translateX);
-
-  const gestureHandler = useAnimatedGestureHandler({
-    onStart: (_, ctx: any) => {
-      ctx.startX = translateX.value;
-      console.log('this is start ctx', ctx);
-    },
-    onActive: (event, ctx) => {
-      const newPosition = Math.max(
-        minBound,
-        Math.min(maxBound, ctx.startX + event.translationX),
-      );
-      translateX.value = newPosition;
-      console.log('this is Active ctx', ctx);
-      runOnJS(onDrag)(newPosition);
-    },
-    onEnd: () => {
-      translateX.value = withSpring(translateX.value);
-    },
-  });
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{translateX: translateX.value}],
-  }));
-
-  return (
-    <PanGestureHandler onGestureEvent={gestureHandler}>
-      <Animated.View style={[styles.handle, styles.leftHandle, animatedStyle]}>
-        <View style={styles.handleBar} />
-      </Animated.View>
-    </PanGestureHandler>
-  );
-};
-
-const RightSegmentHandle = ({
-  segmentWidth,
-  onDrag,
-  minBound,
-  maxBound,
-}: {
-  segmentWidth: number;
-  onDrag: (newPosition: number) => void;
-  minBound: number;
-  maxBound: number;
-}) => {
-  // Initialize the handle at the right edge of the segment
-  // We multiply by FRAME_WIDTH because segmentWidth is in number of frames
-  const translateX = useSharedValue(segmentWidth);
-  console.log('this is Active translateX', translateX);
-
-  const panGesture = Gesture.Pan()
-    .onStart((event, ctx: any) => {
-      console.log('Active event:', event);
-      // ctx.startX = translateX.value;
-    })
-    .onUpdate((event) => {
-      console.log('Active event onUpdate:', event);
-      const newPosition = Math.max(
-        minBound * FRAME_WIDTH,
-        Math.min(
-          maxBound * FRAME_WIDTH - HANDLE_WIDTH,
-          // ctx.startX + event.translationX,
-        ),
-      );
-
-      // Snap to frame boundaries
-      const frameSnap = Math.round(newPosition / FRAME_WIDTH) * FRAME_WIDTH;
-      translateX.value = frameSnap;
-      console.log('Snapped position:', frameSnap, newPosition);
-      runOnJS(onDrag)(frameSnap);
-    })
-    .onEnd(() => {
-      translateX.value = withSpring(translateX.value, {
-        damping: 20,
-        stiffness: 300,
-      });
-    });
-
-  return (
-    <GestureDetector gesture={panGesture}>
-      <Animated.View style={[styles.handle, styles.rightHandle,{transform: [{translateX}]}]}>
-        <View style={styles.handleBar} />
-      </Animated.View>
-    </GestureDetector>
-  );
-};
 
 const FramePicks: React.FC<FramePicksProps> = React.memo(
   ({
@@ -161,7 +73,67 @@ const FramePicks: React.FC<FramePicksProps> = React.memo(
     onSegmentAdjust,
     isMainHandleVisible = true,
   }) => {
-    const [selectedSegment, setSelectedSegment] = useState<number | null>(null);
+    const [segmentHistory, setSegmentHistory] = useState<SegmentHistory>({});
+
+  // Add a segment initialization effect
+useEffect(() => {
+  if (selectedSegmentIndex !== null && !segmentHistory[selectedSegmentIndex]) {
+    // Initialize history for newly selected segments
+    const segment = segments[selectedSegmentIndex];
+    setSegmentHistory(prev => ({
+      ...prev,
+      [selectedSegmentIndex]: {
+        originalStart: segment.start,
+        originalEnd: segment.end,
+        currentStart: segment.start,
+        currentEnd: segment.end,
+        lastModified: Date.now()
+      }
+    }));
+  }
+}, [selectedSegmentIndex, segments]);
+
+    const frameToTimestamp = useCallback(
+      (frameIndex: number) => {
+        return (frameIndex / data.length) * duration;
+      },
+      [data.length, duration],
+    );
+
+    const formatTime = useCallback((time: number): string => {
+      const minutes = Math.floor(time / 60);
+      const seconds = Math.floor(time % 60);
+      const milliseconds = Math.floor((time % 1) * 100);
+      return `${minutes}:${seconds.toString().padStart(2, '0')}.${milliseconds
+        .toString()
+        .padStart(2, '0')}`;
+    }, []);
+
+    useEffect(() => {
+      if (
+        selectedSegmentIndex !== null &&
+        segmentHistory[selectedSegmentIndex]
+      ) {
+        const history = segmentHistory[selectedSegmentIndex];
+        const originalStartTime = frameToTimestamp(history.originalStart);
+        const originalEndTime = frameToTimestamp(history.originalEnd);
+        const currentStartTime = frameToTimestamp(history.currentStart);
+        const currentEndTime = frameToTimestamp(history.currentEnd);
+
+        console.log(
+          `
+        Loading Segment ${selectedSegmentIndex + 1} History:
+        ====================================
+        Original Boundaries:
+        - Start: ${formatTime(originalStartTime)}
+        - End: ${formatTime(originalEndTime)}
+        Current State:
+        - Start: ${formatTime(currentStartTime)}
+        - End: ${formatTime(currentEndTime)}
+      `.replace(/^\s+/gm, ''),
+        );
+      }
+    }, [selectedSegmentIndex, segmentHistory, frameToTimestamp, formatTime]);
 
     const segments = React.useMemo(() => {
       if (splitPoints.length === 0) {
@@ -197,52 +169,106 @@ const FramePicks: React.FC<FramePicksProps> = React.memo(
       return segments;
     }, [data.length, splitPoints]);
 
-    const handleSegmentPress = (
-      segmentIndex: number,
-      isFullTimeline: boolean,
-    ) => {
+    // const handleSegmentPress = (
+    //   segmentIndex: number,
+    //   isFullTimeline: boolean,
+    // ) => {
+    //   if (onSegmentSelect) {
+    //     if (isFullTimeline && splitPoints.length === 0) {
+    //       onSegmentSelect(segmentIndex);
+    //     } else if (!isFullTimeline && splitPoints.length > 0) {
+    //       onSegmentSelect(segmentIndex);
+    //     }
+    //   }
+    // };
+
+    // Update handleSegmentPress to ensure proper position restoration
+    const handleSegmentPress = (segmentIndex: number, isFullTimeline: boolean) => {
       if (onSegmentSelect) {
-        if (isFullTimeline && splitPoints.length === 0) {
-          onSegmentSelect(segmentIndex);
-        } else if (!isFullTimeline && splitPoints.length > 0) {
+        if ((isFullTimeline && splitPoints.length === 0) || 
+            (!isFullTimeline && splitPoints.length > 0)) {
+          // Load the segment's saved position
+          const historyData = segmentHistory[segmentIndex];
+          if (historyData) {
+            console.log(`
+              Restoring Segment ${segmentIndex + 1} Position:
+              =====================================
+              Original Range: ${formatTime(frameToTimestamp(historyData.originalStart))} - ${formatTime(frameToTimestamp(historyData.originalEnd))}
+              Restored Range: ${formatTime(frameToTimestamp(historyData.currentStart))} - ${formatTime(frameToTimestamp(historyData.currentEnd))}
+            `.replace(/^\s+/gm, ''));
+          }
+          
           onSegmentSelect(segmentIndex);
         }
       }
     };
 
-    const handleDrag = (
-      side: 'left' | 'right',
-      segmentIndex: number,
-      newPosition: number,
-    ) => {
-      if (!onSegmentAdjust) return;
+    // Enhanced handleValueChange with detailed tracking
+    const handleValueChange = useCallback(
+      (values: {min: number; max: number}) => {
+        if (!onSegmentAdjust || selectedSegmentIndex === null) return;
 
-      const segment = segments[segmentIndex];
-      const frameIndex = Math.round(newPosition / FRAME_WIDTH);
+        const segment = segments[selectedSegmentIndex];
+        const newStartFrame = values.min;
+        const newEndFrame = values.max;
 
-      let newStartFrame = segment.start;
-      let newEndFrame = segment.end;
+        // Update segment history
+        setSegmentHistory(prev => {
+          const currentHistory = prev[selectedSegmentIndex] || {
+            originalStart: segment.start,
+            originalEnd: segment.end,
+            currentStart: segment.start,
+            currentEnd: segment.end,
+            lastModified: Date.now(),
+          };
 
-      if (side === 'right') {
-        const minFrame = segment.start + 1;
-        const maxFrame =
-          segmentIndex < segments.length - 1
-            ? segments[segmentIndex + 1].start - 1
-            : data.length - 1;
+          // Calculate timestamps for logging
+          const startTime = frameToTimestamp(newStartFrame);
+          const endTime = frameToTimestamp(newEndFrame);
+          const originalStartTime = frameToTimestamp(
+            currentHistory.originalStart,
+          );
+          const originalEndTime = frameToTimestamp(currentHistory.originalEnd);
 
-        newEndFrame = Math.max(minFrame, Math.min(maxFrame, frameIndex));
+          // Log the changes
+          console.log(
+            `
+        Segment ${selectedSegmentIndex + 1} Adjustment:
+        ================================
+        Original Segment:
+        - Start: ${formatTime(originalStartTime)}
+        - End: ${formatTime(originalEndTime)}
+        - Duration: ${formatTime(originalEndTime - originalStartTime)}
 
-        console.log('Right handle drag:', {
-          position: newPosition,
-          frameIndex,
-          minFrame,
-          maxFrame,
-          newEndFrame,
+        New Active Region:
+        - Start: ${formatTime(startTime)}
+        - End: ${formatTime(endTime)}
+        - Duration: ${formatTime(endTime - startTime)}
+
+        Changes:
+        - Start Offset: ${formatTime(startTime - originalStartTime)}
+        - End Offset: ${formatTime(originalEndTime - endTime)}
+        - Total Trimmed: ${formatTime(
+          originalEndTime - originalStartTime - (endTime - startTime),
+        )}
+      `.replace(/^\s+/gm, ''),
+          );
+          return {
+            ...prev,
+            [selectedSegmentIndex]: {
+              ...currentHistory,
+              currentStart: newStartFrame,
+              currentEnd: newEndFrame,
+              lastModified: Date.now(),
+            },
+          };
         });
-      }
 
-      onSegmentAdjust(segmentIndex, newStartFrame, newEndFrame);
-    };
+        // Call the parent's onSegmentAdjust
+        onSegmentAdjust(selectedSegmentIndex, newStartFrame, newEndFrame);
+      },
+      [selectedSegmentIndex, segments, onSegmentAdjust, frameToTimestamp],
+    );
 
     const totalWidth = React.useMemo(() => {
       const baseWidth = data.length * FRAME_WIDTH;
@@ -252,67 +278,89 @@ const FramePicks: React.FC<FramePicksProps> = React.memo(
       return baseWidth + gapsWidth + extraPadding;
     }, [data.length, splitPoints.length]);
 
+   const renderSegment = (segment: any, segmentIndex: number) => {
+  const segmentWidth = (segment.end - segment.start + 1) * FRAME_WIDTH;
+  const isSelected = selectedSegmentIndex === segmentIndex;
+  
+  // Get the history for this segment if it exists
+  const segmentHistoryData = segmentHistory[segmentIndex];
+  
+  // Calculate relative positions within the segment
+  const initialStart = segmentHistoryData 
+    ? segmentHistoryData.currentStart - segment.start 
+    : 0;
+  const initialEnd = segmentHistoryData 
+    ? segmentHistoryData.currentEnd - segment.start 
+    : segment.end - segment.start;
+
+  return (
+    <TouchableOpacity
+          key={segmentIndex}
+          onPress={() => handleSegmentPress(segmentIndex, segment.isFullTimeline)}
+          style={[
+            styles.segmentContainer,
+            {
+              marginRight: segmentIndex < segments.length - 1 ? SEGMENT_GAP : 0,
+              width: segmentWidth,
+            },
+            isSelected && styles.selectedSegment,
+          ]}>
+          {/* Render base frames */}
+          {data
+            .slice(segment.start, segment.end + 1)
+            .map((frame, frameIndex) => (
+              <View key={frameIndex} style={styles.frameWrapper}>
+                <Image
+                  source={{uri: `file://${frame.uri}`}}
+                  style={styles.frameImage}
+                  resizeMode="cover"
+                />
+              </View>
+            ))}
+          {isSelected && !segment.isFullTimeline && (
+            <View style={styles.trimmerContainer}>
+              <AudioTrimTimelineFun
+                data={data.slice(segment.start, segment.end + 1)}
+                min={initialStart}         // Use history-based initial position
+                max={initialEnd}           // Use history-based initial position
+                step={1}
+                timestampStart={segment.start}
+                timestampEnd={segment.end}
+                sliderWidth={segmentWidth}
+                onChangeHandler={handleValueChange}
+                isHandlesVisible={isMainHandleVisible}
+                renderRails={() => (
+                  <View style={styles.railsContainer}>
+                    {data
+                      .slice(segment.start, segment.end + 1)
+                      .map((frame, idx) => (
+                        <View key={idx} style={styles.frameWrapper}>
+                          <Image
+                            source={{uri: `file://${frame.uri}`}}
+                            style={styles.frameImage}
+                            resizeMode="cover"
+                          />
+                        </View>
+                      ))}
+                  </View>
+                )}
+              />
+            </View>
+          )}
+          
+          <View
+            style={[
+              styles.segmentBorder,
+              isSelected && styles.selectedSegmentBorder,
+            ]}
+          />
+        </TouchableOpacity>
+      );
+    };
+    
     return (
       <View style={[styles.framePicksContainer, {width: totalWidth}]}>
-        {segments.map((segment, segmentIndex) => {
-          const segmentWidth = (segment.end - segment.start + 1) * FRAME_WIDTH;
-          console.log('Segment width:', segmentWidth, segment);
-          return (
-            <TouchableOpacity
-              key={segmentIndex}
-              onPress={() =>
-                handleSegmentPress(segmentIndex, segment.isFullTimeline)
-              }
-              style={[
-                styles.segmentContainer,
-                {
-                  marginRight:
-                    segmentIndex < segments.length - 1 ? SEGMENT_GAP : 0,
-                  width: segmentWidth,
-                },
-                selectedSegmentIndex === segmentIndex && styles.selectedSegment,
-              ]}>
-              {data
-                .slice(segment.start, segment.end + 1)
-                .map((frame, frameIndex) => (
-                  <View key={frameIndex} style={styles.frameWrapper}>
-                    <Image
-                      source={{uri: `file://${frame.uri}`}}
-                      style={[styles.frameImage]}
-                      resizeMode="cover"
-                    />
-                  </View>
-                ))}
-              {selectedSegmentIndex === segmentIndex &&
-                !segment.isFullTimeline && (
-                  <>
-                    <LeftSegmentHandle
-                      onDrag={newPosition =>
-                        handleDrag('left', segmentIndex, newPosition)
-                      }
-                      minBound={0}
-                      maxBound={segment.end * FRAME_WIDTH - HANDLE_WIDTH}
-                    />
-                    <RightSegmentHandle
-                      segmentWidth={segmentWidth} // This gives us the width in number of frames
-                      onDrag={newPosition =>
-                        handleDrag('right', segmentIndex, newPosition)
-                      }
-                      minBound={segment.start} // Minimum bound is the start of the segment
-                      maxBound={segmentWidth} // Maximum bound includes the end frame
-                    />
-                  </>
-                )}
-              <View
-                style={[
-                  styles.segmentBorder,
-                  selectedSegmentIndex === segmentIndex &&
-                    styles.selectedSegmentBorder,
-                ]}
-              />
-            </TouchableOpacity>
-          );
-        })}
+        {segments.map((segment, index) => renderSegment(segment, index))}
       </View>
     );
   },
@@ -334,15 +382,6 @@ const styles = StyleSheet.create({
     borderColor: '#444',
     height: FRAME_BAR_HEIGHT,
     position: 'relative',
-  },
-  handle: {
-    position: 'absolute',
-    width: HANDLE_WIDTH,
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 0, 0, 0.96)',
-    zIndex: 99, // Increased z-index
   },
   selectedSegment: {
     backgroundColor: '#3A3A3A',
@@ -373,22 +412,19 @@ const styles = StyleSheet.create({
     height: FRAME_BAR_HEIGHT,
     backgroundColor: '#333',
   },
-  leftHandle: {
+  trimmerContainer: {
+    position: 'absolute',
+    top: 0,
     left: 0,
-    borderTopLeftRadius: 6,
-    borderBottomLeftRadius: 6,
-  },
-  rightHandle: {
     right: 0,
-    borderTopRightRadius: 6,
-    borderBottomRightRadius: 6,
+    bottom: 0,
+    zIndex: 10,
+    backgroundColor: 'rgba(221, 27, 27, 0.84)',
   },
-  handleBar: {
-    width: 4,
-    height: '50%',
-    backgroundColor: '#fff',
-    borderRadius: 2,
-    zIndex: 99,
+  railsContainer: {
+    flexDirection: 'row',
+    height: FRAME_BAR_HEIGHT,
+    backgroundColor: 'red',
   },
 });
 

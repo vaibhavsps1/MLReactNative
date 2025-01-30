@@ -55,7 +55,7 @@ const Thumb = ({side}: ThumbProps) => {
         alignItems: 'center',
         ...borderRadius,
       }}>
-      <View style={{borderWidth: 1.2, height: 15, borderRadius: 5}} />
+      <View style={{borderWidth: 2, height: 15, borderRadius: 5}} />
     </View>
   );
 };
@@ -224,8 +224,6 @@ const AudioTrimTimelineFun: FC<Props> = ({
     );
   };
 
-  console.log('handle visible', isHandlesVisible);
-
   return (
     <GestureHandlerRootView style={styles.container}>
       <ScrollView
@@ -288,17 +286,18 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 30,
+    backgroundColor: 'pink',
   },
   timeRulerContainer: {
     flexDirection: 'row',
     height: 30,
   },
-  container: {flex: 1,},
+  container: {flex: 1, backgroundColor: 'red'},
   inactiveRailSlider: {
     flexDirection: 'row',
     alignItems: 'center',
     height: AUDIO_TRIM_SLIDER_HEIGHT,
-    // backgroundColor: '#DFEAFB',
+    backgroundColor: '#DFEAFB',
     opacity: 0.3,
   },
   timeRulerMark: {

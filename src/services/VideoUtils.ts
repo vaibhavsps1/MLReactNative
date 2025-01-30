@@ -12,15 +12,10 @@ export class VideoUtils {
       console.log('Cleaning frames directory:', framesDir);
       
       if (await RNFS.exists(framesDir)) {
-        // Read all files in the directory first
         const files = await RNFS.readDir(framesDir);
-        
-        // Delete each file individually
         await Promise.all(
           files.map(file => RNFS.unlink(file.path))
         );
-        
-        // Then remove the directory
         await RNFS.unlink(framesDir);
         console.log('Frames cleanup completed');
       }

@@ -21,3 +21,26 @@ export interface VideoMetadata {
   width: number;
   height: number;
 }
+
+export interface SplitPoint {
+  id: string;
+  time: number;
+  frameIndex: number;
+}
+
+export interface ProcessingProgress {
+  segment: number;
+  total: number;
+  progress: number;
+}
+
+export interface ScrollingTimelineProps {
+  frames: Frame[];
+  splitPoints: SplitPoint[];
+  duration: number;
+  currentTime: number;
+  onTimeChange: (time: number) => void;
+  onSplitPointsChange: (points: SplitPoint[]) => void;
+  onAddSplit?: () => void;
+  isPlaying: boolean;
+}
