@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useCallback} from 'react';
 import {FC, useRef} from 'react';
 import {NativeScrollEvent, NativeSyntheticEvent} from 'react-native';
 import {View, StyleSheet, ScrollView, Text} from 'react-native';
@@ -11,6 +11,7 @@ import Animated, {
   useAnimatedGestureHandler,
   useAnimatedStyle,
   useSharedValue,
+  withSpring,
 } from 'react-native-reanimated';
 
 interface Props {
@@ -24,6 +25,8 @@ interface Props {
   onChangeHandler(values: {min: number; max: number}): void;
   data: Frame[];
   isHandlesVisible?: boolean;
+  isActive?: boolean;
+  onActiveChange?: (active: boolean) => void;
 }
 
 interface Frame {
@@ -98,6 +101,10 @@ const AudioTrimTimelineFun: FC<Props> = ({
   onChangeHandler,
   data,
   isHandlesVisible = true,
+  timestampStart,
+  timestampEnd,
+  isActive = false,
+  onActiveChange,
 }) => {
   const minPosition = useSharedValue(0);
   const maxPosition = useSharedValue(sliderWidth);
@@ -105,6 +112,43 @@ const AudioTrimTimelineFun: FC<Props> = ({
   const rulerScrollRef = useRef<ScrollView>(null);
   const isMainScrolling = useRef(false);
   const isRulerScrolling = useRef(false);
+  // Add shared values for animation
+  const opacity = useSharedValue(1);
+  const railScale = useSharedValue(1);
+
+  // Add animated styles for inactive segments
+  const inactiveRailStyle = useAnimatedStyle(() => {
+    return {
+      opacity: opacity.value,
+      transform: [{scaleY: railScale.value}],
+    };
+  });
+
+  // Update sliderStyle to include visibility animation
+  const sliderStyle = useAnimatedStyle(() => {
+    return {
+      width: maxPosition.value - minPosition.value,
+      transform: [
+        {translateX: minPosition.value},
+        {scaleY: isActive ? 1 : railScale.value},
+      ],
+      opacity: isActive ? 1 : opacity.value,
+    };
+  });
+
+  const handleFocusChange = useCallback(
+    (focused: boolean) => {
+      if (focused) {
+        opacity.value = withSpring(1);
+        railScale.value = withSpring(1);
+      } else {
+        opacity.value = withSpring(0.5);
+        railScale.value = withSpring(0.8);
+      }
+      onActiveChange?.(focused);
+    },
+    [opacity, railScale, onActiveChange],
+  );
 
   const handleMainScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     if (!isRulerScrolling.current && rulerScrollRef.current) {
@@ -134,55 +178,109 @@ const AudioTrimTimelineFun: FC<Props> = ({
     }
   };
 
-  const gestureHandlerMin = useAnimatedGestureHandler({
-    onStart(evt, ctx: {startX: number}) {
-      ctx.startX = minPosition.value;
-    },
-    onActive(evt, ctx) {
-      const combinedPosition = ctx.startX + evt.translationX;
-      const minClamp = 0;
-      const maxClamp = maxPosition.value - 3; // Update to match thumb width
+  // const gestureHandlerMin = useAnimatedGestureHandler({
+  //   onStart(evt, ctx: {startX: number}) {
+  //     ctx.startX = minPosition.value;
+  //   },
+  //   onActive(evt, ctx) {
+  //     const combinedPosition = ctx.startX + evt.translationX;
+  //     const minClamp = 0;
+  //     const maxClamp = maxPosition.value - 3; // Update to match thumb width
 
-      // Snap to frames
-      const frameSnap = Math.round(combinedPosition / step) * step;
-      minPosition.value = Math.max(minClamp, Math.min(frameSnap, maxClamp));
-    },
-    onEnd() {
-      const values = calculateMinMaxValue({
-        min,
-        max,
-        minPositionValue: minPosition.value,
-        maxPositionValue: maxPosition.value,
-        step,
-        maxSliderWidth: sliderWidth,
-      });
-      runOnJS(onChangeHandler)(values);
-    },
-  });
+  //     // Snap to frames
+  //     const frameSnap = Math.round(combinedPosition / step) * step;
+  //     minPosition.value = Math.max(minClamp, Math.min(frameSnap, maxClamp));
+  //   },
+  //   onEnd() {
+  //     const values = calculateMinMaxValue({
+  //       min,
+  //       max,
+  //       minPositionValue: minPosition.value,
+  //       maxPositionValue: maxPosition.value,
+  //       step,
+  //       maxSliderWidth: sliderWidth,
+  //     });
+  //     runOnJS(onChangeHandler)(values);
+  //   },
+  // });
 
-  const gestureHandlerMax = useAnimatedGestureHandler({
-    onStart(evt, ctx: {startX: number}) {
-      ctx.startX = maxPosition.value;
-    },
-    onActive(evt, ctx) {
-      const combinedPosition = ctx.startX + evt.translationX;
-      const minClamp = minPosition.value + 3;
-      const maxClamp = sliderWidth;
-      const frameSnap = Math.round(combinedPosition / step) * step;
-      maxPosition.value = Math.max(minClamp, Math.min(frameSnap, maxClamp));
-    },
-    onEnd() {
-      const values = calculateMinMaxValue({
-        min,
-        max,
-        minPositionValue: minPosition.value,
-        maxPositionValue: maxPosition.value,
-        step,
-        maxSliderWidth: sliderWidth,
-      });
-      runOnJS(onChangeHandler)(values);
-    },
-  });
+  // const gestureHandlerMax = useAnimatedGestureHandler({
+  //   onStart(evt, ctx: {startX: number}) {
+  //     ctx.startX = maxPosition.value;
+  //   },
+  //   onActive(evt, ctx) {
+  //     const combinedPosition = ctx.startX + evt.translationX;
+  //     const minClamp = minPosition.value + 3;
+  //     const maxClamp = sliderWidth;
+  //     const frameSnap = Math.round(combinedPosition / step) * step;
+  //     maxPosition.value = Math.max(minClamp, Math.min(frameSnap, maxClamp));
+  //   },
+  //   onEnd() {
+  //     const values = calculateMinMaxValue({
+  //       min,
+  //       max,
+  //       minPositionValue: minPosition.value,
+  //       maxPositionValue: maxPosition.value,
+  //       step,
+  //       maxSliderWidth: sliderWidth,
+  //     });
+  //     runOnJS(onChangeHandler)(values);
+  //   },
+  // });
+
+  // const gestureHandlerMin = useAnimatedGestureHandler({
+  //   onStart(evt, ctx: {startX: number}) {
+  //     ctx.startX = minPosition.value;
+  //   },
+  //   onActive(evt, ctx) {
+  //     const combinedPosition = ctx.startX + evt.translationX;
+  //     const frameSnap = Math.round(combinedPosition / step) * step;
+  //     const minClamp = 0;
+  //     const maxClamp = maxPosition.value - 3;
+
+  //     minPosition.value = Math.max(minClamp, Math.min(frameSnap, maxClamp));
+  //     runOnJS(logTrimState)(minPosition.value, maxPosition.value);
+  //   },
+  //   onEnd() {
+  //     const values = calculateMinMaxValue({
+  //       min,
+  //       max,
+  //       minPositionValue: minPosition.value,
+  //       maxPositionValue: maxPosition.value,
+  //       step,
+  //       maxSliderWidth: sliderWidth,
+  //     });
+  //     runOnJS(onChangeHandler)(values);
+  //     runOnJS(logTrimState)(minPosition.value, maxPosition.value);
+  //   },
+  // });
+
+  // const gestureHandlerMax = useAnimatedGestureHandler({
+  //   onStart(evt, ctx: {startX: number}) {
+  //     ctx.startX = maxPosition.value;
+  //   },
+  //   onActive(evt, ctx) {
+  //     const combinedPosition = ctx.startX + evt.translationX;
+  //     const frameSnap = Math.round(combinedPosition / step) * step;
+  //     const minClamp = minPosition.value + 3;
+  //     const maxClamp = sliderWidth;
+
+  //     maxPosition.value = Math.max(minClamp, Math.min(frameSnap, maxClamp));
+  //     runOnJS(logTrimState)(minPosition.value, maxPosition.value);
+  //   },
+  //   onEnd() {
+  //     const values = calculateMinMaxValue({
+  //       min,
+  //       max,
+  //       minPositionValue: minPosition.value,
+  //       maxPositionValue: maxPosition.value,
+  //       step,
+  //       maxSliderWidth: sliderWidth,
+  //     });
+  //     runOnJS(onChangeHandler)(values);
+  //     runOnJS(logTrimState)(minPosition.value, maxPosition.value);
+  //   },
+  // });
 
   const animatedStyleMin = useAnimatedStyle(() => {
     return {
@@ -196,17 +294,119 @@ const AudioTrimTimelineFun: FC<Props> = ({
     };
   });
 
-  const sliderStyle = useAnimatedStyle(() => {
-    return {
-      width: maxPosition.value - minPosition.value,
-      transform: [{translateX: minPosition.value}],
-    };
-  });
+  // const sliderStyle = useAnimatedStyle(() => {
+  //   return {
+  //     width: maxPosition.value - minPosition.value,
+  //     transform: [{translateX: minPosition.value}],
+  //   };
+  // });
 
   const innerSliderStyle = useAnimatedStyle(() => {
     return {
       transform: [{translateX: -minPosition.value}],
     };
+  });
+
+  // Safe time formatting function
+  const formatTime = useCallback((seconds: number): string => {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = Math.floor(seconds % 60);
+    const milliseconds = Math.floor((seconds % 1) * 1000);
+    return `${minutes}:${remainingSeconds
+      .toString()
+      .padStart(2, '0')}.${milliseconds.toString().padStart(3, '0')}`;
+  }, []);
+
+  // Helper function to calculate position in time
+  const calculateTimePosition = useCallback(
+    (position: number): number => {
+      const segmentLength = Number(timestampEnd) - Number(timestampStart);
+      return Number(timestampStart) + (position / sliderWidth) * segmentLength;
+    },
+    [timestampStart, timestampEnd, sliderWidth],
+  );
+
+  const logTrimState = useCallback(
+    (leftPos: number, rightPos: number) => {
+      const startTime = calculateTimePosition(leftPos);
+      const endTime = calculateTimePosition(rightPos);
+      const segmentStartTime = Number(timestampStart);
+      const segmentEndTime = Number(timestampEnd);
+      const startTrim = startTime - segmentStartTime;
+      const endTrim = segmentEndTime - endTime;
+      const activeDuration = endTime - startTime;
+      const totalTrimmed = startTrim + endTrim;
+
+      console.log(`
+      📏 Trim State
+      ============
+      Full Segment:
+      - Start: ${formatTime(segmentStartTime)}
+      - End: ${formatTime(segmentEndTime)}
+      - Duration: ${formatTime(segmentEndTime - segmentStartTime)}
+
+      Active Region:
+      - Start: ${formatTime(startTime)}
+      - End: ${formatTime(endTime)}
+      - Duration: ${formatTime(activeDuration)}
+
+      Trimmed Portions:
+      - Start Trim: ${formatTime(startTrim)}
+      - End Trim: ${formatTime(endTrim)}
+      - Total Trimmed: ${formatTime(totalTrimmed)}
+    `);
+    },
+    [calculateTimePosition, formatTime, timestampStart, timestampEnd],
+  );
+
+  const gestureHandlerMin = useAnimatedGestureHandler({
+    onStart(evt, ctx: {startX: number}) {
+      ctx.startX = minPosition.value;
+    },
+    onActive(evt, ctx) {
+      const combinedPosition = ctx.startX + evt.translationX;
+      const frameSnap = Math.round(combinedPosition / step) * step;
+      const minClamp = 0;
+      const maxClamp = maxPosition.value - 3;
+      minPosition.value = Math.max(minClamp, Math.min(frameSnap, maxClamp));
+    },
+    onEnd() {
+      const values = calculateMinMaxValue({
+        min,
+        max,
+        minPositionValue: minPosition.value,
+        maxPositionValue: maxPosition.value,
+        step,
+        maxSliderWidth: sliderWidth,
+      });
+      runOnJS(onChangeHandler)(values);
+      runOnJS(logTrimState)(minPosition.value, maxPosition.value);
+    },
+  });
+
+  const gestureHandlerMax = useAnimatedGestureHandler({
+    onStart(evt, ctx: {startX: number}) {
+      ctx.startX = maxPosition.value;
+    },
+    onActive(evt, ctx) {
+      const combinedPosition = ctx.startX + evt.translationX;
+      const frameSnap = Math.round(combinedPosition / step) * step;
+      const minClamp = minPosition.value + 3;
+      const maxClamp = sliderWidth;
+      maxPosition.value = Math.max(minClamp, Math.min(frameSnap, maxClamp));
+    },
+    onEnd() {
+      const values = calculateMinMaxValue({
+        min,
+        max,
+        minPositionValue: minPosition.value,
+        maxPositionValue: maxPosition.value,
+        step,
+        maxSliderWidth: sliderWidth,
+      });
+      runOnJS(onChangeHandler)(values);
+      runOnJS(logTrimState)(minPosition.value, maxPosition.value);
+    },
   });
 
   const TimeRulerMark: React.FC<TimeRulerProps> = ({index}) => {

@@ -21,9 +21,10 @@ import AntIcon from 'react-native-vector-icons/AntDesign';
 import {formatVideoTime, VideoUtils} from './services/VideoUtils';
 import {Frame} from './types';
 import FramePicks from './components/FramePicks';
-import { SplitIcon, TrashIcon} from './utils/images';
+import {SplitIcon, TrashIcon} from './utils/images';
 import VideoSegment from './components/VideoSegment';
 import SegmentTimeline from './components/SegmentTimeline';
+import Toast from './utils/Toast';
 
 // Constants
 const {width: SCREEN_WIDTH} = Dimensions.get('window');
@@ -31,6 +32,7 @@ const FRAME_BAR_HEIGHT = 50;
 const TIMELINE_CENTER = SCREEN_WIDTH / 2;
 const FRAME_WIDTH = VideoUtils.FRAME_WIDTH;
 const TIME_INDICATOR_HEIGHT = 25;
+const BREAKPOINT_SIZE = 50;
 
 interface SplitPoint {
   id: string;
@@ -82,6 +84,14 @@ const VideoClip = () => {
     number | null
   >(null);
   const [mainHandlesVisible, setMainHandlesVisible] = useState(true);
+  const [toastConfig, setToastConfig] = useState({
+    visible: false,
+    message: '',
+    type: 'info' as 'success' | 'error' | 'info',
+  });
+  const [isFrameBarCompressed, setIsFrameBarCompressed] = useState(false);
+  const frameBarAnimation = useSharedValue(1);
+  const scrollOffset = useSharedValue(0);
 
   const startSplitPosition = useSharedValue<number>(0);
   const endSplitPosition = useSharedValue<number>(0);
@@ -134,6 +144,17 @@ const VideoClip = () => {
     await handleCleanup();
   }, []);
 
+  const showToast = (
+    message: string,
+    type: 'success' | 'error' | 'info' = 'info',
+  ) => {
+    setToastConfig({
+      visible: true,
+      message,
+      type,
+    });
+  };
+
   const formatTime = useCallback((time: number): string => {
     const minutes = Math.floor(time / 60);
     const seconds = Math.floor(time % 60);
@@ -142,38 +163,6 @@ const VideoClip = () => {
       .toString()
       .padStart(2, '0')}`;
   }, []);
-
-  // const handleSegmentSelect = (index: number) => {
-  //   setSelectedSegmentIndex(prevIndex => {
-  //     const newIndex = prevIndex === index ? null : index;
-  //     // Update main handles visibility based on selection
-  //     setMainHandlesVisible(newIndex === null);
-  //     return newIndex;
-  //   });
-
-  //   if (videoRef.current) {
-  //     let segmentStartTime;
-  //     let segmentEndTime;
-
-  //     if (splitPoints.length === 0) {
-  //       segmentStartTime = 0;
-  //       segmentEndTime = duration;
-  //     } else {
-  //       segmentStartTime = index === 0 ? 0 : splitPoints[index - 1].time;
-  //       segmentEndTime = splitPoints[index]
-  //         ? splitPoints[index].time
-  //         : duration;
-  //     }
-
-  //     setCurrentTime(segmentStartTime);
-  //     videoRef.current.seek(segmentStartTime);
-
-  //     setSelectedTimeRange({
-  //       start: segmentStartTime,
-  //       end: segmentEndTime,
-  //     });
-  //   }
-  // };
 
   const generateFrames = async (uri: string, videoDuration: number) => {
     const numberOfFrames = Math.ceil(videoDuration * VideoUtils.FRAME_PER_SEC);
@@ -214,105 +203,35 @@ const VideoClip = () => {
     }
   };
 
-  const getSegmentTimes = (
-    splitPoints: SplitPoint[],
-    totalDuration: number,
-  ) => {
-    const sortedPoints = [...splitPoints].sort((a, b) => a.time - b.time);
-    const segments = [];
-    let startTime = 0;
-    sortedPoints.forEach(point => {
-      segments.push([startTime, point.time]);
-      startTime = point.time;
-    });
-    segments.push([startTime, totalDuration]);
-    return segments;
-  };
-
-  const parseTimeToSeconds = (timestamp: string): number => {
-    const [minutes, rest] = timestamp.split(':');
-    const [seconds, milliseconds] = rest.split('.');
-    return (
-      parseInt(minutes) * 60 + parseInt(seconds) + parseInt(milliseconds) / 100
-    );
-  };
-
-  // const handleFrameTrim = async () => {
-  //   setIsCropping(true);
-  //   trimVideo(
-  //     videoUri,
-  //     frameToTimestamp(value.min, frames.length, duration),
-  //     frameToTimestamp(value.max, frames.length, duration),
-  //   );
-  //   try {
-  //     const downloadDir = rnfs.DownloadDirectoryPath;
-  //     const appName = 'FrameTrimmer';
-  //     const appDir = `${downloadDir}/${appName}`;
-
-  //     const exists = await rnfs.exists(appDir);
-  //     if (!exists) {
-  //       await rnfs.mkdir(appDir);
-  //     }
-
-  //     const outputPath = `${downloadDir}/${appName}/trimmed_${Date.now()}.mp4`;
-  //     const command = `-i "${videoUri}" -ss ${frameToTimestamp(
-  //       value.min,
-  //       frames.length,
-  //       duration,
-  //     )} -to ${frameToTimestamp(
-  //       value.max,
-  //       frames.length,
-  //       duration,
-  //     )} -c copy "${outputPath}"`;
-
-  //     await FFmpegKit.execute(command);
-  //     Alert.alert('Success', `Video saved to: ${outputPath}`, [
-  //       {
-  //         text: 'OK',
-  //         onPress: async () => {
-  //           setIsPlaying(false);
-  //           setCurrentTime(0);
-  //           setDuration(0);
-  //           setIsVideoReady(false);
-  //           setFrames([]);
-  //           setIsGeneratingFrames(false);
-  //           setFrameGenerationProgress(0);
-  //           setValue({min: 0, max: 0});
-  //           setIsProcessing(false);
-  //           setIsSplitSelecting(false);
-  //           setSplitPoints([]);
-  //           setProcessingProgress(null);
-  //           setSelectedTimeRange({start: 0, end: 0});
-  //           setIsCropping(false);
-  //           setSaveButtonDisabled(true);
-  //           setTrimStartTime(0);
-  //           setTrimEndTime(0);
-  //           setVideoUri(null);
-  //           setIsSplitMode(false);
-  //           await handleCleanup();
-  //         },
-  //       },
-  //     ]);
-  //   } catch (error) {
-  //     console.error('Trim error:', error);
-  //     Alert.alert('Error', 'Failed to trim video');
-  //   }
-  // };
-
   const handleScroll = useCallback(
     (event: any) => {
       if (isUserScrolling.current) {
         const offsetX = event.nativeEvent.contentOffset.x;
-        const frameIndex = Math.floor(offsetX / FRAME_WIDTH);
-        let newTime = Math.max(
+        const adjustedOffset = Math.max(0, offsetX);
+        const frameIndex = Math.max(
           0,
-          Math.min(duration, (frameIndex / frames.length) * duration),
+          Math.min(frames.length - 1, Math.floor(adjustedOffset / FRAME_WIDTH)),
         );
+        const newTime = Math.max(
+          0,
+          Math.min(
+            duration,
+            (frameIndex / Math.max(1, frames.length - 1)) * duration,
+          ),
+        );
+        const formattedTime = formatTime(newTime);
         if (isCropping) {
-          newTime = Math.max(trimStartTime, Math.min(trimEndTime, newTime));
+          const boundedTime = Math.max(
+            trimStartTime,
+            Math.min(trimEndTime, newTime),
+          );
+          setCurrentTime(boundedTime);
+          videoRef.current?.seek(boundedTime);
+        } else {
+          setCurrentTime(newTime);
+          videoRef.current?.seek(newTime);
         }
-        setCurrentTime(newTime);
-        videoRef.current?.seek(newTime);
+
         if (isCropping && isPlaying) {
           setIsPlaying(false);
         }
@@ -332,7 +251,6 @@ const VideoClip = () => {
     (data: any) => {
       if (!isUserScrolling.current) {
         const newTime = data.currentTime;
-
         if (isCropping) {
           if (newTime >= trimEndTime - 0.1) {
             setCurrentTime(trimStartTime);
@@ -395,16 +313,38 @@ const VideoClip = () => {
 
   const handleUpdateSegment = useCallback(
     (segmentIndex: number, startFrame: number, endFrame: number) => {
+      const segment = segments[segmentIndex];
+      if (!segment) return;
+      const segmentEndTime = splitPoints[segmentIndex]
+        ? splitPoints[segmentIndex].time
+        : duration;
+      const maxEndFrame = Math.ceil(
+        (segmentEndTime / duration) * frames.length,
+      );
+
       setSegments(prevSegments => {
         const newSegments = [...prevSegments];
         newSegments[segmentIndex] = {
           startIndex: startFrame,
-          endIndex: endFrame,
+          endIndex: Math.min(endFrame, maxEndFrame),
         };
         return newSegments;
       });
+      const startTime = frameToTimestamp(startFrame, frames.length, duration);
+      const endTime = frameToTimestamp(
+        Math.min(endFrame, maxEndFrame),
+        frames.length,
+        duration,
+      );
+
+      console.log(`
+      Updated Segment ${segmentIndex + 1} Boundaries:
+      Start Frame: ${startFrame} (${formatTime(startTime)})
+      End Frame: ${endFrame} (${formatTime(endTime)})
+      Max End Frame: ${maxEndFrame}
+    `);
     },
-    [],
+    [segments, splitPoints, duration, frames.length],
   );
 
   const renderSplitMarkers = useCallback(() => {
@@ -424,37 +364,114 @@ const VideoClip = () => {
                   transform: [{translateX: absolutePosition}],
                   height: FRAME_BAR_HEIGHT + 8,
                 },
-              ]}>
-              <View style={styles.splitLine} />
-            </View>
+              ]}></View>
           );
         })}
       </View>
     );
   }, [splitPoints, frames.length]);
 
+  const checkFrameIntersection = useCallback(
+    (currentTime: number) => {
+      const exactFramePosition = (currentTime / duration) * frames.length;
+      const currentFrameIndex = Math.floor(exactFramePosition);
+      const nextFrameIndex = Math.ceil(exactFramePosition);
+      const distanceToNextFrame = Math.abs(exactFramePosition - nextFrameIndex);
+      const distanceToPrevFrame = Math.abs(
+        exactFramePosition - currentFrameIndex,
+      );
+      const allowance = 0.35; // 35% allowance
+      const isNearBoundary =
+        distanceToNextFrame <= allowance || distanceToPrevFrame <= allowance;
+      console.log('isNearBoundary', isNearBoundary);
+      const distanceFromCenter = Math.min(
+        distanceToNextFrame,
+        distanceToPrevFrame,
+      );
+
+      console.log(`
+  === Intersection Check at ${formatTime(currentTime)} ===
+  Frame Position: ${exactFramePosition.toFixed(3)}
+  Current Frame: ${currentFrameIndex}
+  Next Frame: ${nextFrameIndex}
+  Distance to Previous Frame: ${distanceToPrevFrame.toFixed(3)}
+  Distance to Next Frame: ${distanceToNextFrame.toFixed(3)}
+  Allowance: ${allowance}
+  Is Near Boundary: ${isNearBoundary ? 'YES' : 'NO'}
+  ${isNearBoundary ? '✅ VALID SPLIT POSITION' : '❌ NOT AT INTERSECTION'}
+  Closest Distance: ${distanceFromCenter.toFixed(3)}
+  ${distanceToPrevFrame <= allowance ? '-> Near Previous Frame' : ''}
+  ${distanceToNextFrame <= allowance ? '-> Near Next Frame' : ''}
+  ==================================
+      `);
+      return {
+        isNear: isNearBoundary,
+        distanceFromCenter,
+        debug: {
+          exactPosition: exactFramePosition,
+          currentFrame: currentFrameIndex,
+          nextFrame: nextFrameIndex,
+          distanceToNext: distanceToNextFrame,
+          distanceToPrev: distanceToPrevFrame,
+        },
+      };
+    },
+    [duration, frames.length],
+  );
+
   const handleAddSplit = useCallback(() => {
     if (!isVideoReady || !videoRef.current) return;
+    const intersectionCheck = checkFrameIntersection(currentTime);
+    const {isNear, distanceFromCenter, debug} = intersectionCheck;
+    console.log(`
+  === Split Attempt ===
+  Time: ${formatTime(currentTime)}
+  ${isNear ? '✅ Valid Position' : '❌ Invalid Position'}
+  Frame Details:
+  - Exact Position: ${debug.exactPosition.toFixed(3)}
+  - Current Frame: ${debug.currentFrame}
+  - Next Frame: ${debug.nextFrame}
+  - Distance to Previous: ${debug.distanceToPrev.toFixed(3)}
+  - Distance to Next: ${debug.distanceToNext.toFixed(3)}
+  ==================
+    `);
+    if (!isNear) {
+      showToast(
+        'Please align with frame boundaries to add split point',
+        'error',
+      );
+      return;
+    }
+    console.log(`
+  === Adding Split Point ===
+  ✅ Valid split position detected:
+  Time: ${formatTime(currentTime)}
+  Frame Index: ${debug.currentFrame}
+  Closest Boundary Distance: ${Math.min(
+    debug.distanceToNext,
+    debug.distanceToPrev,
+  ).toFixed(3)}
+  =====================
+    `);
+    const currentFrameIndex = Math.floor(
+      (currentTime / duration) * frames.length,
+    );
     const newSplitPoint = {
       id: Date.now().toString(),
-      time: currentTime,
-      frameIndex: Math.floor((currentTime / duration) * frames.length),
+      time: frameToTimestamp(currentFrameIndex, frames.length, duration),
+      frameIndex: currentFrameIndex,
     };
-    console.log('this newSplit', newSplitPoint);
     const nearbyPoint = splitPoints.find(
       point => Math.abs(point.time - currentTime) < 0.5,
     );
     if (nearbyPoint) {
-      Alert.alert(
-        'Split Point Exists',
-        'A split point already exists near this position',
-      );
+      showToast('A split point already exists near this position', 'error');
       return;
     }
     if (currentTime < 1 || currentTime > duration - 1) {
-      Alert.alert(
-        'Invalid Position',
-        'Please add split points at least 1 second from the start/end',
+      showToast(
+        'Please add split points at least 1 second from start/end',
+        'error',
       );
       return;
     }
@@ -463,12 +480,17 @@ const VideoClip = () => {
         (a, b) => a.time - b.time,
       );
       if (newPoints.length > 10) {
-        Alert.alert(
-          'Maximum Splits Reached',
-          'You can have up to 10 split points',
-        );
+        showToast('Maximum of 10 split points allowed', 'error');
         return prev;
       }
+      showToast('Split point added successfully', 'success');
+      console.log(`
+  === Split Point Added ===
+  Position: ${formatTime(newSplitPoint.time)}
+  Frame Index: ${newSplitPoint.frameIndex}
+  Total Split Points: ${newPoints.length}
+  ====================
+      `);
       return newPoints;
     });
     splitPointPositions.value = {
@@ -516,11 +538,9 @@ const VideoClip = () => {
           return outputPath;
         }),
       );
-
       Alert.alert('Success', `Saved ${segments.length} video segments`, [
         {text: 'OK', onPress: resetVideoState},
       ]);
-
       return outputPaths;
     } catch (error) {
       console.error('Video processing error:', error);
@@ -539,96 +559,120 @@ const VideoClip = () => {
     setIsPlaying(prev => !prev);
   }, [isCropping, trimStartTime]);
 
-  const frameToTimestamp = (frameIndex, totalFrames, duration) => {
-    return (frameIndex / totalFrames) * duration;
+  const frameToTimestamp = (
+    frameIndex: number,
+    totalFrames: number,
+    duration: number,
+  ): number => {
+    return Number(((frameIndex / (totalFrames - 1)) * duration).toFixed(3));
   };
 
-  // Enhanced handleSegmentSelect with detailed logging
-  const handleSegmentSelect = index => {
-    setSelectedSegmentIndex(prevIndex => {
-      const newIndex = prevIndex === index ? null : index;
-      setMainHandlesVisible(newIndex === null);
-      if (newIndex !== null && newIndex !== prevIndex) {
-        let segmentStartTime, segmentEndTime;
-        if (splitPoints.length === 0) {
-          segmentStartTime = 0;
-          segmentEndTime = duration;
-        } else {
-          segmentStartTime = index === 0 ? 0 : splitPoints[index - 1].time;
-          segmentEndTime = splitPoints[index]
+  const handleSegmentSelect = useCallback(
+    (index: number) => {
+      setSelectedSegmentIndex(prevIndex => {
+        const newIndex = prevIndex === index ? null : index;
+        setMainHandlesVisible(newIndex === null);
+
+        setIsFrameBarCompressed(newIndex !== null);
+        // if (newIndex !== null && newIndex !== prevIndex) {
+        //   const segmentStartTime =
+        //     index === 0 ? 0 : splitPoints[index - 1].time;
+        //   const segmentEndTime = splitPoints[index]
+        //     ? splitPoints[index].time
+        //     : duration;
+        //   const startFrameIndex = Math.round(
+        //     (segmentStartTime / duration) * (frames.length - 1),
+        //   );
+        //   const endFrameIndex = Math.round(
+        //     (segmentEndTime / duration) * (frames.length - 1),
+        //   );
+        //   const currentSegment = segments[index] || {
+        //     startIndex: startFrameIndex,
+        //     endIndex: endFrameIndex,
+        //   };
+        //   const activeStartTime =
+        //     (currentSegment.startIndex / (frames.length - 1)) * duration;
+        //   const activeEndTime =
+        //     (currentSegment.endIndex / (frames.length - 1)) * duration;
+        //   const trimmedStart = Number(
+        //     (activeStartTime - segmentStartTime).toFixed(3),
+        //   );
+        //   const trimmedEnd = Number(
+        //     (segmentEndTime - activeEndTime).toFixed(3),
+        //   );
+        //   console.log(
+        //     `
+        //   Segment ${index + 1} Information:
+        //   =============================
+        //   Frame Indices:
+        //   - Start Frame: ${currentSegment.startIndex}
+        //   - End Frame: ${currentSegment.endIndex}
+        //   - Total Frames: ${frames.length}
+
+        //   Full Segment Boundaries:
+        //   - Start: ${formatTime(segmentStartTime)}
+        //   - End: ${formatTime(segmentEndTime)}
+        //   - Total Duration: ${formatTime(segmentEndTime - segmentStartTime)}
+
+        //   Active Region (Between Handles):
+        //   - Start: ${formatTime(activeStartTime)}
+        //   - End: ${formatTime(activeEndTime)}
+        //   - Active Duration: ${formatTime(activeEndTime - activeStartTime)}
+
+        //   Trimmed Portions:
+        //   - Start Trim: ${formatTime(trimmedStart)}
+        //   - End Trim: ${formatTime(trimmedEnd)}
+
+        //   Raw Values:
+        //   - Active End Time: ${activeEndTime}
+        //   - Segment End Time: ${segmentEndTime}
+        // `.replace(/^\s+/gm, ''),
+        //   );
+        // }
+        if (newIndex !== null) {
+          // Calculate segment position
+          const segmentStartTime =
+            index === 0 ? 0 : splitPoints[index - 1].time;
+          const segmentEndTime = splitPoints[index]
             ? splitPoints[index].time
             : duration;
+          scrollOffset.value = scrollViewRef.current?.contentOffset?.x || 0;
+          const scrollPosition =
+            (segmentStartTime / duration) * (frames.length * FRAME_WIDTH);
+          scrollViewRef.current?.scrollTo({x: scrollPosition, animated: true});
+        } else {
+          scrollViewRef.current?.scrollTo({
+            x: scrollOffset.value,
+            animated: true,
+          });
         }
-
-        // Get current trim handles position
-        const currentSegment = segments[index] || {
-          startIndex: 0,
-          endIndex: frames.length - 1,
-        };
-
-        // Calculate active region (between trim handles)
-        const activeStartTime = frameToTimestamp(
-          currentSegment.startIndex,
-          frames.length,
-          duration,
-        );
-        const activeEndTime = frameToTimestamp(
-          currentSegment.endIndex,
-          frames.length,
-          duration,
-        );
-
-        // Calculate trimmed portions
-        const trimmedStart = activeStartTime - segmentStartTime;
-        const trimmedEnd = segmentEndTime - activeEndTime;
-
-        console.log(
-          `
-        Segment ${index + 1} Information:
-        =============================
-        Full Segment Boundaries:
-        - Start: ${formatTime(segmentStartTime)}
-        - End: ${formatTime(segmentEndTime)}
-        - Total Duration: ${formatTime(segmentEndTime - segmentStartTime)}
-        
-        Active Region (Between Handles):
-        - Start: ${formatTime(activeStartTime)}
-        - End: ${formatTime(activeEndTime)}
-        - Active Duration: ${formatTime(activeEndTime - activeStartTime)}
-        
-        Trimmed Portions:
-        - Start Trim: ${formatTime(trimmedStart)}
-        - End Trim: ${formatTime(trimmedEnd)}
-      `.replace(/^\s+/gm, ''),
-        );
-      }
-
-      return newIndex;
-    });
-
-    if (videoRef.current) {
-      let segmentStartTime;
-      const segmentEndTime = splitPoints[index]
-        ? splitPoints[index].time
-        : duration;
-
-      if (index === 0) {
-        segmentStartTime = 0;
-      } else {
-        segmentStartTime = splitPoints[index - 1].time;
-      }
-
-      setCurrentTime(segmentStartTime);
-      videoRef.current.seek(segmentStartTime);
-      setSelectedTimeRange({
-        start: segmentStartTime,
-        end: segmentEndTime,
+        return newIndex;
       });
-    }
-  };
+      if (videoRef.current) {
+        const segmentStartTime = index === 0 ? 0 : splitPoints[index - 1].time;
+        const segmentEndTime = splitPoints[index]
+          ? splitPoints[index].time
+          : duration;
+
+        setCurrentTime(segmentStartTime);
+        videoRef.current.seek(segmentStartTime);
+        setSelectedTimeRange({
+          start: segmentStartTime,
+          end: segmentEndTime,
+        });
+      }
+    },
+    [splitPoints, duration, frames.length, segments],
+  );
 
   return (
     <GestureHandlerRootView style={styles.container}>
+      <Toast
+        visible={toastConfig.visible}
+        message={toastConfig.message}
+        type={toastConfig.type}
+        onHide={() => setToastConfig(prev => ({...prev, visible: false}))}
+      />
       <View>
         <TouchableOpacity
           style={styles.backButton}
@@ -691,7 +735,14 @@ const VideoClip = () => {
                   ref={scrollViewRef}
                   horizontal
                   showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.framesContainer}
+                  contentContainerStyle={[
+                    styles.framesContainer,
+                    {
+                      width:
+                        frames.length * FRAME_WIDTH + TIMELINE_CENTER * 2 + 10,
+                      paddingHorizontal: TIMELINE_CENTER,
+                    },
+                  ]}
                   onScroll={handleScroll}
                   onScrollBeginDrag={() => {
                     setIsPlaying(false);
@@ -702,15 +753,14 @@ const VideoClip = () => {
                       isUserScrolling.current = false;
                     }, 50);
                   }}
+                  bounces={false}
                   scrollEventThrottle={16}
                   removeClippedSubviews={true}
                   decelerationRate="fast">
-                  <View style={{width: TIMELINE_CENTER}} />
                   {isGeneratingFrames ? (
                     <View style={styles.loadingContainer}>
                       <ActivityIndicator color="#fff" />
                       <Text style={styles.loadingText}>
-                        Generating frames...{' '}
                         {Math.round(frameGenerationProgress * 100)}%
                       </Text>
                     </View>
@@ -807,7 +857,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     alignItems: 'center',
     zIndex: 100,
-    width: 3,
+    width: 2,
     overflow: 'visible',
   },
   splitLine: {
@@ -998,7 +1048,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     color: '#fff',
-    marginLeft: 10,
+    marginLeft: 5,
   },
   toolsContainer: {
     flexDirection: 'row',
@@ -1136,8 +1186,6 @@ const styles = StyleSheet.create({
   framesWrapper: {
     flexDirection: 'row',
     height: FRAME_BAR_HEIGHT,
-    width: '110%',
-    paddingRight: 120,
   },
   handleTime: {
     position: 'absolute',

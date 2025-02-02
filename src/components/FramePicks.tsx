@@ -1,7 +1,8 @@
 import React, {useState, useCallback, useEffect} from 'react';
-import {StyleSheet, View, Image, TouchableOpacity} from 'react-native';
+import {StyleSheet, View, Image, TouchableOpacity, Dimensions} from 'react-native';
 import {VideoUtils} from '../services/VideoUtils';
 import AudioTrimTimelineFun from './AudioTrimTimelineFun';
+import { useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 
 interface Frame {
   uri: string;
@@ -52,16 +53,21 @@ interface FramePicksProps {
     newEndFrame: number,
   ) => void;
   isMainHandleVisible?: boolean;
+  isCompressed: boolean;
+  onCompress?: () => void;
+  onExpand?: () => void;
 }
 
 const FRAME_BAR_HEIGHT = 50;
 const FRAME_WIDTH = VideoUtils.FRAME_WIDTH;
-const SEGMENT_GAP = 4;
+const SEGMENT_GAP = 2;
+const SCREEN_WIDTH = Dimensions.get('screen').width;
 
 const FramePicks: React.FC<FramePicksProps> = React.memo(
   ({
     data,
     splitPoints = [],
+    isCompressed,
     onAddSplit,
     onRemoveSplit,
     canSplit = true,
@@ -74,24 +80,43 @@ const FramePicks: React.FC<FramePicksProps> = React.memo(
     isMainHandleVisible = true,
   }) => {
     const [segmentHistory, setSegmentHistory] = useState<SegmentHistory>({});
+    const compressedWidth = useSharedValue(SCREEN_WIDTH);
+  const inactiveOpacity = useSharedValue(1);
 
-  // Add a segment initialization effect
-useEffect(() => {
-  if (selectedSegmentIndex !== null && !segmentHistory[selectedSegmentIndex]) {
-    // Initialize history for newly selected segments
-    const segment = segments[selectedSegmentIndex];
-    setSegmentHistory(prev => ({
-      ...prev,
-      [selectedSegmentIndex]: {
-        originalStart: segment.start,
-        originalEnd: segment.end,
-        currentStart: segment.start,
-        currentEnd: segment.end,
-        lastModified: Date.now()
+  const segmentStyle = useAnimatedStyle(() => {
+    return {
+      width: isCompressed ? withSpring(compressedWidth.value) : withSpring(totalWidth),
+      opacity: 1,
+    };
+  });
+
+  const inactiveStyle = useAnimatedStyle(() => {
+    return {
+      opacity: withTiming(isCompressed ? 0 : 1, { duration: 300 }),
+      height: withSpring(isCompressed ? 0 : FRAME_BAR_HEIGHT),
+    };
+  });
+
+    // Add a segment initialization effect
+    useEffect(() => {
+      if (
+        selectedSegmentIndex !== null &&
+        !segmentHistory[selectedSegmentIndex]
+      ) {
+        // Initialize history for newly selected segments
+        const segment = segments[selectedSegmentIndex];
+        setSegmentHistory(prev => ({
+          ...prev,
+          [selectedSegmentIndex]: {
+            originalStart: segment.start,
+            originalEnd: segment.end,
+            currentStart: segment.start,
+            currentEnd: segment.end,
+            lastModified: Date.now(),
+          },
+        }));
       }
-    }));
-  }
-}, [selectedSegmentIndex, segments]);
+    }, [selectedSegmentIndex, segments]);
 
     const frameToTimestamp = useCallback(
       (frameIndex: number) => {
@@ -183,27 +208,36 @@ useEffect(() => {
     // };
 
     // Update handleSegmentPress to ensure proper position restoration
-    const handleSegmentPress = (segmentIndex: number, isFullTimeline: boolean) => {
+    const handleSegmentPress = (
+      segmentIndex: number,
+      isFullTimeline: boolean,
+    ) => {
       if (onSegmentSelect) {
-        if ((isFullTimeline && splitPoints.length === 0) || 
-            (!isFullTimeline && splitPoints.length > 0)) {
+        if (
+          (isFullTimeline && splitPoints.length === 0) ||
+          (!isFullTimeline && splitPoints.length > 0)
+        ) {
           // Load the segment's saved position
           const historyData = segmentHistory[segmentIndex];
           if (historyData) {
-            console.log(`
+            console.log(
+              `
               Restoring Segment ${segmentIndex + 1} Position:
               =====================================
-              Original Range: ${formatTime(frameToTimestamp(historyData.originalStart))} - ${formatTime(frameToTimestamp(historyData.originalEnd))}
-              Restored Range: ${formatTime(frameToTimestamp(historyData.currentStart))} - ${formatTime(frameToTimestamp(historyData.currentEnd))}
-            `.replace(/^\s+/gm, ''));
+              Original Range: ${formatTime(
+                frameToTimestamp(historyData.originalStart),
+              )} - ${formatTime(frameToTimestamp(historyData.originalEnd))}
+              Restored Range: ${formatTime(
+                frameToTimestamp(historyData.currentStart),
+              )} - ${formatTime(frameToTimestamp(historyData.currentEnd))}
+            `.replace(/^\s+/gm, ''),
+            );
           }
-          
           onSegmentSelect(segmentIndex);
         }
       }
     };
 
-    // Enhanced handleValueChange with detailed tracking
     const handleValueChange = useCallback(
       (values: {min: number; max: number}) => {
         if (!onSegmentAdjust || selectedSegmentIndex === null) return;
@@ -212,7 +246,6 @@ useEffect(() => {
         const newStartFrame = values.min;
         const newEndFrame = values.max;
 
-        // Update segment history
         setSegmentHistory(prev => {
           const currentHistory = prev[selectedSegmentIndex] || {
             originalStart: segment.start,
@@ -221,53 +254,67 @@ useEffect(() => {
             currentEnd: segment.end,
             lastModified: Date.now(),
           };
-
-          // Calculate timestamps for logging
-          const startTime = frameToTimestamp(newStartFrame);
-          const endTime = frameToTimestamp(newEndFrame);
-          const originalStartTime = frameToTimestamp(
-            currentHistory.originalStart,
+          const segmentStartTime = frameToTimestamp(segment.start);
+          const segmentEndTime = frameToTimestamp(segment.end);
+          const segmentDuration = segmentEndTime - segmentStartTime;
+          const activeStartTime = frameToTimestamp(
+            segment.start + newStartFrame,
           );
-          const originalEndTime = frameToTimestamp(currentHistory.originalEnd);
+          const activeEndTime = frameToTimestamp(segment.start + newEndFrame);
+          const activeDuration = activeEndTime - activeStartTime;
+          const startTrim = activeStartTime - segmentStartTime;
+          const endTrim = segmentEndTime - activeEndTime;
+          const totalTrimmed = startTrim + endTrim;
 
-          // Log the changes
           console.log(
             `
         Segment ${selectedSegmentIndex + 1} Adjustment:
         ================================
-        Original Segment:
-        - Start: ${formatTime(originalStartTime)}
-        - End: ${formatTime(originalEndTime)}
-        - Duration: ${formatTime(originalEndTime - originalStartTime)}
+        Full Segment Boundaries:
+        - Start: ${formatTime(segmentStartTime)}
+        - End: ${formatTime(segmentEndTime)}
+        - Total Duration: ${formatTime(segmentDuration)}
 
-        New Active Region:
-        - Start: ${formatTime(startTime)}
-        - End: ${formatTime(endTime)}
-        - Duration: ${formatTime(endTime - startTime)}
+        Active Region (Between Handles):
+        - Start: ${formatTime(activeStartTime)}
+        - End: ${formatTime(activeEndTime)}
+        - Active Duration: ${formatTime(activeDuration)}
 
-        Changes:
-        - Start Offset: ${formatTime(startTime - originalStartTime)}
-        - End Offset: ${formatTime(originalEndTime - endTime)}
-        - Total Trimmed: ${formatTime(
-          originalEndTime - originalStartTime - (endTime - startTime),
-        )}
+        Trimmed Portions:
+        - Start Trim: ${formatTime(startTrim)}
+        - End Trim: ${formatTime(endTrim)}
+        - Total Trimmed: ${formatTime(totalTrimmed)}
+
+        Relative Changes:
+        - Active Portion: ${((activeDuration / segmentDuration) * 100).toFixed(
+          1,
+        )}%
+        - Trimmed Portion: ${((totalTrimmed / segmentDuration) * 100).toFixed(
+          1,
+        )}%
       `.replace(/^\s+/gm, ''),
           );
+
           return {
             ...prev,
             [selectedSegmentIndex]: {
               ...currentHistory,
-              currentStart: newStartFrame,
-              currentEnd: newEndFrame,
+              currentStart: segment.start + newStartFrame,
+              currentEnd: segment.start + newEndFrame,
               lastModified: Date.now(),
             },
           };
         });
 
-        // Call the parent's onSegmentAdjust
         onSegmentAdjust(selectedSegmentIndex, newStartFrame, newEndFrame);
       },
-      [selectedSegmentIndex, segments, onSegmentAdjust, frameToTimestamp],
+      [
+        selectedSegmentIndex,
+        segments,
+        onSegmentAdjust,
+        frameToTimestamp,
+        formatTime,
+      ],
     );
 
     const totalWidth = React.useMemo(() => {
@@ -278,25 +325,23 @@ useEffect(() => {
       return baseWidth + gapsWidth + extraPadding;
     }, [data.length, splitPoints.length]);
 
-   const renderSegment = (segment: any, segmentIndex: number) => {
-  const segmentWidth = (segment.end - segment.start + 1) * FRAME_WIDTH;
-  const isSelected = selectedSegmentIndex === segmentIndex;
-  
-  // Get the history for this segment if it exists
-  const segmentHistoryData = segmentHistory[segmentIndex];
-  
-  // Calculate relative positions within the segment
-  const initialStart = segmentHistoryData 
-    ? segmentHistoryData.currentStart - segment.start 
-    : 0;
-  const initialEnd = segmentHistoryData 
-    ? segmentHistoryData.currentEnd - segment.start 
-    : segment.end - segment.start;
+    const renderSegment = (segment: any, segmentIndex: number) => {
+      const segmentWidth = (segment.end - segment.start + 1) * FRAME_WIDTH;
+      const isSelected = selectedSegmentIndex === segmentIndex;
+      const segmentHistoryData = segmentHistory[segmentIndex];
+      const initialStart = segmentHistoryData
+        ? segmentHistoryData.currentStart - segment.start
+        : 0;
+      const initialEnd = segmentHistoryData
+        ? segmentHistoryData.currentEnd - segment.start
+        : segment.end - segment.start;
 
-  return (
-    <TouchableOpacity
+      return (
+        <TouchableOpacity
           key={segmentIndex}
-          onPress={() => handleSegmentPress(segmentIndex, segment.isFullTimeline)}
+          onPress={() =>
+            handleSegmentPress(segmentIndex, segment.isFullTimeline)
+          }
           style={[
             styles.segmentContainer,
             {
@@ -321,8 +366,8 @@ useEffect(() => {
             <View style={styles.trimmerContainer}>
               <AudioTrimTimelineFun
                 data={data.slice(segment.start, segment.end + 1)}
-                min={initialStart}         // Use history-based initial position
-                max={initialEnd}           // Use history-based initial position
+                min={initialStart}
+                max={initialEnd}
                 step={1}
                 timestampStart={segment.start}
                 timestampEnd={segment.end}
@@ -347,7 +392,7 @@ useEffect(() => {
               />
             </View>
           )}
-          
+
           <View
             style={[
               styles.segmentBorder,
@@ -357,7 +402,7 @@ useEffect(() => {
         </TouchableOpacity>
       );
     };
-    
+
     return (
       <View style={[styles.framePicksContainer, {width: totalWidth}]}>
         {segments.map((segment, index) => renderSegment(segment, index))}
