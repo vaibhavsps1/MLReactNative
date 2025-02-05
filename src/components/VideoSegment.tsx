@@ -1,15 +1,197 @@
+// // // VideoSegment.tsx
+// // import React from 'react';
+// // import {View, StyleSheet, ScrollView} from 'react-native';
+// // import Animated, {
+// //   useAnimatedStyle,
+// //   useAnimatedGestureHandler,
+// //   runOnJS,
+// //   useSharedValue,
+// // } from 'react-native-reanimated';
+// // import {PanGestureHandler} from 'react-native-gesture-handler';
+// // import {Frame} from '../types';
+// // import {Image} from 'react-native-svg';
+
+// // interface Props {
+// //   frames: Frame[];
+// //   startIndex: number;
+// //   endIndex: number;
+// //   onUpdateBoundaries: (start: number, end: number) => void;
+// //   totalFrames: number;
+// // }
+
+// // interface DragHandlerProps {
+// //   segmentTimes: number[][]; // 2D array of start/end times
+// //   duration: number;
+// //   onSegmentUpdate: (index: number, start: number, end: number) => void;
+// // }
+
+// // const FRAME_WIDTH = 50;
+// // const FRAME_HEIGHT = 50;
+// // const HANDLE_WIDTH = 20;
+
+// // export const VideoSegment = ({
+// //   frames,
+// //   startIndex,
+// //   endIndex,
+// //   onUpdateBoundaries,
+// //   totalFrames,
+// // }: Props) => {
+// //   const leftHandle = useAnimatedGestureHandler({
+// //     onStart: (_, ctx: any) => {
+// //       ctx.startX = startIndex * FRAME_WIDTH;
+// //     },
+// //     onActive: (event, ctx) => {
+// //       const newPosition = Math.max(
+// //         0,
+// //         Math.min(ctx.startX + event.translationX, (endIndex - 1) * FRAME_WIDTH),
+// //       );
+// //       runOnJS(onUpdateBoundaries)(
+// //         Math.floor(newPosition / FRAME_WIDTH),
+// //         endIndex,
+// //       );
+// //     },
+// //   });
+
+// //   const DragHandlers = ({segmentTimes, duration, onSegmentUpdate}) => {
+// //     const handlers = segmentTimes.map((segment, index) => {
+// //       const [start, end] = segment;
+// //       const leftPos = useSharedValue(start);
+// //       const rightPos = useSharedValue(end);
+
+// //       const leftGesture = useAnimatedGestureHandler({
+// //         onStart: (_, ctx) => {
+// //           ctx.startX = leftPos.value;
+// //         },
+// //         onActive: (event, ctx) => {
+// //           const newPos = Math.max(
+// //             0,
+// //             Math.min(ctx.startX + event.translationX, rightPos.value - 1),
+// //           );
+// //           leftPos.value = newPos;
+// //         },
+// //         onEnd: () => {
+// //           runOnJS(onSegmentUpdate)(index, leftPos.value, rightPos.value);
+// //         },
+// //       });
+
+// //       const rightGesture = useAnimatedGestureHandler({
+// //         onStart: (_, ctx) => {
+// //           ctx.startX = rightPos.value;
+// //         },
+// //         onActive: (event, ctx) => {
+// //           const newPos = Math.max(
+// //             leftPos.value + 1,
+// //             Math.min(ctx.startX + event.translationX, duration),
+// //           );
+// //           rightPos.value = newPos;
+// //         },
+// //         onEnd: () => {
+// //           runOnJS(onSegmentUpdate)(index, leftPos.value, rightPos.value);
+// //         },
+// //       });
+
+// //       return (
+// //         <View key={index} style={styles.segmentContainer}>
+// //           <PanGestureHandler onGestureEvent={leftGesture}>
+// //             <Animated.View style={[styles.handle, styles.leftHandle]} />
+// //           </PanGestureHandler>
+
+// //           <PanGestureHandler onGestureEvent={rightGesture}>
+// //             <Animated.View style={[styles.handle, styles.rightHandle]} />
+// //           </PanGestureHandler>
+// //         </View>
+// //       );
+// //     });
+
+// //     return <>{handlers}</>;
+// //   };
+// // };
+
+// // const styles = StyleSheet.create({
+// //   handle: {
+// //     width: 20,
+// //     height: FRAME_HEIGHT,
+// //     backgroundColor: 'rgba(0,0,0,0.5)',
+// //     justifyContent: 'center',
+// //     alignItems: 'center',
+// //   },
+// //   leftHandle: {
+// //     borderTopLeftRadius: 8,
+// //     borderBottomLeftRadius: 8,
+// //     left: 0,
+// //   },
+// //   rightHandle: {
+// //     borderTopRightRadius: 8,
+// //     borderBottomRightRadius: 8,
+// //     right: 0,
+// //   },
+// //   segmentContainer: {
+// //     position: 'relative',
+// //     height: FRAME_HEIGHT,
+// //   },
+// //   // segmentContainer: {
+// //   //   position: 'absolute',
+// //   //   height: FRAME_HEIGHT,
+// //   //   backgroundColor: '#2a2a2a',
+// //   //   borderRadius: 8,
+// //   //   overflow: 'hidden',
+// //   // },
+// //   framesScroll: {
+// //     flex: 1,
+// //   },
+// //   framesContainer: {
+// //     flexDirection: 'row',
+// //     height: '100%',
+// //   },
+// //   frameWrapper: {
+// //     width: FRAME_WIDTH,
+// //     height: FRAME_HEIGHT,
+// //   },
+// //   frame: {
+// //     width: '100%',
+// //     height: '100%',
+// //     backgroundColor: '#333',
+// //   },
+// //   // handle: {
+// //   //   position: 'absolute',
+// //   //   top: 0,
+// //   //   width: HANDLE_WIDTH,
+// //   //   height: '100%',
+// //   //   backgroundColor: 'rgba(0, 0, 0, 0.5)',
+// //   //   justifyContent: 'center',
+// //   //   alignItems: 'center',
+// //   // },
+// //   // leftHandle: {
+// //   //   left: 0,
+// //   //   borderTopLeftRadius: 8,
+// //   //   borderBottomLeftRadius: 8,
+// //   // },
+// //   // rightHandle: {
+// //   //   right: 0,
+// //   //   borderTopRightRadius: 8,
+// //   //   borderBottomRightRadius: 8,
+// //   // },
+// //   handleBar: {
+// //     width: 4,
+// //     height: '50%',
+// //     backgroundColor: '#fff',
+// //     borderRadius: 2,
+// //   },
+// // });
+
+// // // export default VideoSegment;
+
 // // VideoSegment.tsx
 // import React from 'react';
-// import {View, StyleSheet, ScrollView} from 'react-native';
+// import {View, StyleSheet, Image} from 'react-native';
 // import Animated, {
-//   useAnimatedStyle,
 //   useAnimatedGestureHandler,
-//   runOnJS,
+//   useAnimatedStyle,
 //   useSharedValue,
+//   runOnJS,
 // } from 'react-native-reanimated';
 // import {PanGestureHandler} from 'react-native-gesture-handler';
 // import {Frame} from '../types';
-// import {Image} from 'react-native-svg';
 
 // interface Props {
 //   frames: Frame[];
@@ -19,129 +201,106 @@
 //   totalFrames: number;
 // }
 
-// interface DragHandlerProps {
-//   segmentTimes: number[][]; // 2D array of start/end times
-//   duration: number;
-//   onSegmentUpdate: (index: number, start: number, end: number) => void;
-// }
-
 // const FRAME_WIDTH = 50;
 // const FRAME_HEIGHT = 50;
 // const HANDLE_WIDTH = 20;
 
-// export const VideoSegment = ({
+// const VideoSegment: React.FC<Props> = ({
 //   frames,
 //   startIndex,
 //   endIndex,
 //   onUpdateBoundaries,
 //   totalFrames,
-// }: Props) => {
-//   const leftHandle = useAnimatedGestureHandler({
+// }) => {
+//   const leftPos = useSharedValue(startIndex * FRAME_WIDTH);
+//   const rightPos = useSharedValue(endIndex * FRAME_WIDTH);
+
+//   const leftGesture = useAnimatedGestureHandler({
 //     onStart: (_, ctx: any) => {
-//       ctx.startX = startIndex * FRAME_WIDTH;
+//       ctx.startX = leftPos.value;
 //     },
 //     onActive: (event, ctx) => {
 //       const newPosition = Math.max(
 //         0,
-//         Math.min(ctx.startX + event.translationX, (endIndex - 1) * FRAME_WIDTH),
+//         Math.min(ctx.startX + event.translationX, rightPos.value - FRAME_WIDTH),
 //       );
+//       leftPos.value = newPosition;
+//     },
+//     onEnd: () => {
 //       runOnJS(onUpdateBoundaries)(
-//         Math.floor(newPosition / FRAME_WIDTH),
-//         endIndex,
+//         Math.floor(leftPos.value / FRAME_WIDTH),
+//         Math.floor(rightPos.value / FRAME_WIDTH),
 //       );
 //     },
 //   });
 
-//   const DragHandlers = ({segmentTimes, duration, onSegmentUpdate}) => {
-//     const handlers = segmentTimes.map((segment, index) => {
-//       const [start, end] = segment;
-//       const leftPos = useSharedValue(start);
-//       const rightPos = useSharedValue(end);
-
-//       const leftGesture = useAnimatedGestureHandler({
-//         onStart: (_, ctx) => {
-//           ctx.startX = leftPos.value;
-//         },
-//         onActive: (event, ctx) => {
-//           const newPos = Math.max(
-//             0,
-//             Math.min(ctx.startX + event.translationX, rightPos.value - 1),
-//           );
-//           leftPos.value = newPos;
-//         },
-//         onEnd: () => {
-//           runOnJS(onSegmentUpdate)(index, leftPos.value, rightPos.value);
-//         },
-//       });
-
-//       const rightGesture = useAnimatedGestureHandler({
-//         onStart: (_, ctx) => {
-//           ctx.startX = rightPos.value;
-//         },
-//         onActive: (event, ctx) => {
-//           const newPos = Math.max(
-//             leftPos.value + 1,
-//             Math.min(ctx.startX + event.translationX, duration),
-//           );
-//           rightPos.value = newPos;
-//         },
-//         onEnd: () => {
-//           runOnJS(onSegmentUpdate)(index, leftPos.value, rightPos.value);
-//         },
-//       });
-
-//       return (
-//         <View key={index} style={styles.segmentContainer}>
-//           <PanGestureHandler onGestureEvent={leftGesture}>
-//             <Animated.View style={[styles.handle, styles.leftHandle]} />
-//           </PanGestureHandler>
-
-//           <PanGestureHandler onGestureEvent={rightGesture}>
-//             <Animated.View style={[styles.handle, styles.rightHandle]} />
-//           </PanGestureHandler>
-//         </View>
+//   const rightGesture = useAnimatedGestureHandler({
+//     onStart: (_, ctx: any) => {
+//       ctx.startX = rightPos.value;
+//     },
+//     onActive: (event, ctx) => {
+//       const newPosition = Math.max(
+//         leftPos.value + FRAME_WIDTH,
+//         Math.min(ctx.startX + event.translationX, totalFrames * FRAME_WIDTH),
 //       );
-//     });
+//       rightPos.value = newPosition;
+//     },
+//     onEnd: () => {
+//       runOnJS(onUpdateBoundaries)(
+//         Math.floor(leftPos.value / FRAME_WIDTH),
+//         Math.floor(rightPos.value / FRAME_WIDTH),
+//       );
+//     },
+//   });
 
-//     return <>{handlers}</>;
-//   };
+//   const leftHandleStyle = useAnimatedStyle(() => ({
+//     transform: [{translateX: leftPos.value}],
+//   }));
+
+//   const rightHandleStyle = useAnimatedStyle(() => ({
+//     transform: [{translateX: rightPos.value - HANDLE_WIDTH-5}],
+//   }));
+
+//   return (
+//     <View
+//       style={[styles.segment, {width: (endIndex - startIndex) * FRAME_WIDTH}]}>
+//       {frames.slice(startIndex, endIndex).map((frame, index) => (
+//         <View key={index} style={styles.frameWrapper}>
+//           <Image
+//             source={{uri: frame.uri}}
+//             style={styles.frame}
+//             resizeMode="cover"
+//           />
+//         </View>
+//       ))}
+
+//       <PanGestureHandler onGestureEvent={leftGesture}>
+//         <Animated.View
+//           style={[styles.handle, styles.leftHandle, leftHandleStyle]}>
+//           <View style={styles.handleBar} />
+//         </Animated.View>
+//       </PanGestureHandler>
+
+//       <PanGestureHandler onGestureEvent={rightGesture}>
+//         <Animated.View
+//           style={[styles.handle, styles.rightHandle, rightHandleStyle]}>
+//           <View style={styles.handleBar} />
+//         </Animated.View>
+//       </PanGestureHandler>
+//     </View>
+//   );
 // };
 
 // const styles = StyleSheet.create({
-//   handle: {
-//     width: 20,
-//     height: FRAME_HEIGHT,
-//     backgroundColor: 'rgba(0,0,0,0.5)',
-//     justifyContent: 'center',
-//     alignItems: 'center',
-//   },
-//   leftHandle: {
-//     borderTopLeftRadius: 8,
-//     borderBottomLeftRadius: 8,
-//     left: 0,
-//   },
-//   rightHandle: {
-//     borderTopRightRadius: 8,
-//     borderBottomRightRadius: 8,
-//     right: 0,
-//   },
-//   segmentContainer: {
+//   segment: {
 //     position: 'relative',
-//     height: FRAME_HEIGHT,
-//   },
-//   // segmentContainer: {
-//   //   position: 'absolute',
-//   //   height: FRAME_HEIGHT,
-//   //   backgroundColor: '#2a2a2a',
-//   //   borderRadius: 8,
-//   //   overflow: 'hidden',
-//   // },
-//   framesScroll: {
-//     flex: 1,
-//   },
-//   framesContainer: {
 //     flexDirection: 'row',
-//     height: '100%',
+//     backgroundColor: '#2A2A2A',
+//     borderRadius: 8,
+//     overflow: 'hidden',
+//     borderWidth: 2,
+//     borderColor: '#444',
+//     height: FRAME_HEIGHT,
 //   },
 //   frameWrapper: {
 //     width: FRAME_WIDTH,
@@ -152,25 +311,23 @@
 //     height: '100%',
 //     backgroundColor: '#333',
 //   },
-//   // handle: {
-//   //   position: 'absolute',
-//   //   top: 0,
-//   //   width: HANDLE_WIDTH,
-//   //   height: '100%',
-//   //   backgroundColor: 'rgba(0, 0, 0, 0.5)',
-//   //   justifyContent: 'center',
-//   //   alignItems: 'center',
-//   // },
-//   // leftHandle: {
-//   //   left: 0,
-//   //   borderTopLeftRadius: 8,
-//   //   borderBottomLeftRadius: 8,
-//   // },
-//   // rightHandle: {
-//   //   right: 0,
-//   //   borderTopRightRadius: 8,
-//   //   borderBottomRightRadius: 8,
-//   // },
+//   handle: {
+//     position: 'absolute',
+//     width: HANDLE_WIDTH,
+//     height: '100%',
+//     backgroundColor: 'rgba(0,0,0,0.5)',
+//     justifyContent: 'center',
+//     alignItems: 'center',
+//     zIndex: 100,
+//   },
+//   leftHandle: {
+//     borderTopLeftRadius: 8,
+//     borderBottomLeftRadius: 8,
+//   },
+//   rightHandle: {
+//     borderTopRightRadius: 8,
+//     borderBottomRightRadius: 8,
+//   },
 //   handleBar: {
 //     width: 4,
 //     height: '50%',
@@ -179,162 +336,143 @@
 //   },
 // });
 
-// // export default VideoSegment;
+// export default VideoSegment;
 
-// VideoSegment.tsx
 import React from 'react';
-import {View, StyleSheet, Image} from 'react-native';
-import Animated, {
-  useAnimatedGestureHandler,
-  useAnimatedStyle,
-  useSharedValue,
-  runOnJS,
-} from 'react-native-reanimated';
-import {PanGestureHandler} from 'react-native-gesture-handler';
-import {Frame} from '../types';
+import {TouchableOpacity, View, Image, StyleSheet} from 'react-native';
+import {SegmentHandle} from './SegmentHandle';
 
-interface Props {
-  frames: Frame[];
-  startIndex: number;
-  endIndex: number;
-  onUpdateBoundaries: (start: number, end: number) => void;
-  totalFrames: number;
+interface Frame {
+  uri: string;
 }
 
+interface VideoSegmentProps {
+  segment: {
+    start: number;
+    end: number;
+    isFullTimeline?: boolean;
+  };
+  frames: Frame[];
+  isSelected: boolean;
+  frameWidth: number;
+  barHeight: number;
+  segmentIndex: number;
+  activeHandle: 'left' | 'right' | null;
+  dynamicWidth?: number;
+  onSelect: (index: number) => void;
+  createPanHandler: (position: 'left' | 'right') => any;
+}
 
-const FRAME_WIDTH = 50;
-const FRAME_HEIGHT = 50;
-const HANDLE_WIDTH = 20;
-
-const VideoSegment: React.FC<Props> = ({
+export const VideoSegment: React.FC<VideoSegmentProps> = ({
+  segment,
   frames,
-  startIndex,
-  endIndex,
-  onUpdateBoundaries,
-  totalFrames,
+  isSelected,
+  frameWidth,
+  barHeight,
+  segmentIndex,
+  activeHandle,
+  dynamicWidth,
+  onSelect,
+  createPanHandler,
 }) => {
-  const leftPos = useSharedValue(startIndex * FRAME_WIDTH);
-  const rightPos = useSharedValue(endIndex * FRAME_WIDTH);
+  const segmentWidth =
+    dynamicWidth ?? (segment.end - segment.start + 1) * frameWidth;
 
-  const leftGesture = useAnimatedGestureHandler({
-    onStart: (_, ctx: any) => {
-      ctx.startX = leftPos.value;
-    },
-    onActive: (event, ctx) => {
-      const newPosition = Math.max(
-        0,
-        Math.min(ctx.startX + event.translationX, rightPos.value - FRAME_WIDTH),
-      );
-      leftPos.value = newPosition;
-    },
-    onEnd: () => {
-      runOnJS(onUpdateBoundaries)(
-        Math.floor(leftPos.value / FRAME_WIDTH),
-        Math.floor(rightPos.value / FRAME_WIDTH),
-      );
-    },
-  });
-
-  const rightGesture = useAnimatedGestureHandler({
-    onStart: (_, ctx: any) => {
-      ctx.startX = rightPos.value;
-    },
-    onActive: (event, ctx) => {
-      const newPosition = Math.max(
-        leftPos.value + FRAME_WIDTH,
-        Math.min(ctx.startX + event.translationX, totalFrames * FRAME_WIDTH),
-      );
-      rightPos.value = newPosition;
-    },
-    onEnd: () => {
-      runOnJS(onUpdateBoundaries)(
-        Math.floor(leftPos.value / FRAME_WIDTH),
-        Math.floor(rightPos.value / FRAME_WIDTH),
-      );
-    },
-  });
-
-  const leftHandleStyle = useAnimatedStyle(() => ({
-    transform: [{translateX: leftPos.value}],
-  }));
-
-  const rightHandleStyle = useAnimatedStyle(() => ({
-    transform: [{translateX: rightPos.value - HANDLE_WIDTH-5}],
-  }));
+  console.log(`
+    [VideoSegment] Rendering
+    Index: ${segmentIndex}
+    Selected: ${isSelected}
+    Active Handle: ${activeHandle}
+    Dynamic Width: ${dynamicWidth}
+    Segment Range: ${segment.start} - ${segment.end}
+  `);
 
   return (
-    <View
-      style={[styles.segment, {width: (endIndex - startIndex) * FRAME_WIDTH}]}>
-      {frames.slice(startIndex, endIndex).map((frame, index) => (
-        <View key={index} style={styles.frameWrapper}>
+    <TouchableOpacity
+      onPress={() => onSelect(segmentIndex)}
+      style={[
+        styles.container,
+        {
+          width: segmentWidth,
+          height: barHeight,
+        },
+        isSelected && styles.selectedContainer,
+      ]}>
+      {/* Frame Images */}
+      {frames.slice(segment.start, segment.end + 1).map((frame, frameIndex) => (
+        <View
+          key={frameIndex}
+          style={[styles.frameWrapper, {width: frameWidth}]}>
           <Image
-            source={{uri: frame.uri}}
-            style={styles.frame}
+            source={{uri: `file://${frame.uri}`}}
+            style={[styles.frameImage, {width: frameWidth}]}
             resizeMode="cover"
           />
         </View>
       ))}
 
-      <PanGestureHandler onGestureEvent={leftGesture}>
-        <Animated.View
-          style={[styles.handle, styles.leftHandle, leftHandleStyle]}>
-          <View style={styles.handleBar} />
-        </Animated.View>
-      </PanGestureHandler>
+      {/* Handles */}
+      {isSelected && (
+        <>
+          <SegmentHandle
+            position="left"
+            isActive={activeHandle === 'left'}
+            panHandlers={createPanHandler('left')}
+            barHeight={barHeight}
+          />
+          <SegmentHandle
+            position="right"
+            isActive={activeHandle === 'right'}
+            panHandlers={createPanHandler('right')}
+            barHeight={barHeight}
+          />
+        </>
+      )}
 
-      <PanGestureHandler onGestureEvent={rightGesture}>
-        <Animated.View
-          style={[styles.handle, styles.rightHandle, rightHandleStyle]}>
-          <View style={styles.handleBar} />
-        </Animated.View>
-      </PanGestureHandler>
-    </View>
+      {/* Border */}
+      <View style={[styles.border, isSelected && styles.selectedBorder]} />
+    </TouchableOpacity>
   );
 };
 
 const styles = StyleSheet.create({
-  segment: {
-    position: 'relative',
+  container: {
     flexDirection: 'row',
-    backgroundColor: '#2A2A2A',
     borderRadius: 8,
-    overflow: 'hidden',
-    borderWidth: 2,
-    borderColor: '#444',
-    height: FRAME_HEIGHT,
+    overflow: 'visible',
+    backgroundColor: 'black',
+    position: 'relative',
+    flexGrow: 0,
+    flexShrink: 1,
+  },
+  selectedContainer: {
+    backgroundColor: '#3A3A3A',
+    zIndex: 1,
   },
   frameWrapper: {
-    width: FRAME_WIDTH,
-    height: FRAME_HEIGHT,
+    position: 'relative',
+    flexGrow: 0,
+    flexShrink: 0,
   },
-  frame: {
-    width: '100%',
+  frameImage: {
     height: '100%',
     backgroundColor: '#333',
+    flexGrow: 0,
+    flexShrink: 0,
   },
-  handle: {
+  border: {
     position: 'absolute',
-    width: HANDLE_WIDTH,
-    height: '100%',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 100,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: '#a6a6a6',
+    backgroundColor: 'transparent',
   },
-  leftHandle: {
-    borderTopLeftRadius: 8,
-    borderBottomLeftRadius: 8,
-  },
-  rightHandle: {
-    borderTopRightRadius: 8,
-    borderBottomRightRadius: 8,
-  },
-  handleBar: {
-    width: 4,
-    height: '50%',
-    backgroundColor: '#fff',
-    borderRadius: 2,
+  selectedBorder: {
+    borderColor: 'white',
+    borderWidth: 2.5,
   },
 });
-
-export default VideoSegment;

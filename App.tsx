@@ -1,8 +1,7 @@
-
 import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import {NavigationContainer} from '@react-navigation/native';
+import {createNativeStackNavigator} from '@react-navigation/native-stack';
+import {GestureHandlerRootView} from 'react-native-gesture-handler';
 
 import VideoClip from './src/VideoClip';
 import FrameTrim from './src/FrameTrim';
@@ -28,20 +27,17 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 
 function App(): JSX.Element {
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
+    <GestureHandlerRootView style={{flex: 1}}>
       <NavigationContainer>
         <Stack.Navigator
-          initialRouteName="VideoClip"
+          initialRouteName="FrameTrim"
           screenOptions={{
             headerShown: false,
             animation: 'slide_from_right',
           }}>
-          <Stack.Screen 
-            name="VideoClip" 
-            component={VideoClip}
-          />
-          <Stack.Screen 
-            name="FrameTrim" 
+          <Stack.Screen name="VideoClip" component={VideoClip} />
+          <Stack.Screen
+            name="FrameTrim"
             component={FrameTrim}
             options={{
               animation: 'slide_from_bottom',

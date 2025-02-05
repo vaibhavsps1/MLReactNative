@@ -22,7 +22,6 @@ import {formatVideoTime, VideoUtils} from './services/VideoUtils';
 import {Frame} from './types';
 import FramePicks from './components/FramePicks';
 import {SplitIcon, TrashIcon} from './utils/images';
-import VideoSegment from './components/VideoSegment';
 import SegmentTimeline from './components/SegmentTimeline';
 import Toast from './utils/Toast';
 
@@ -380,7 +379,7 @@ const VideoClip = () => {
       const distanceToPrevFrame = Math.abs(
         exactFramePosition - currentFrameIndex,
       );
-      const allowance = 0.35; // 35% allowance
+      const allowance = 0; // 35% allowance
       const isNearBoundary =
         distanceToNextFrame <= allowance || distanceToPrevFrame <= allowance;
       console.log('isNearBoundary', isNearBoundary);

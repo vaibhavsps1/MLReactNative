@@ -3,8 +3,8 @@ import { FFmpegKit, FFmpegKitConfig, ReturnCode } from 'ffmpeg-kit-react-native'
 import RNFS from 'react-native-fs';
 
 export class VideoUtils {
-  static FRAME_PER_SEC = 1;
-  static FRAME_WIDTH = 50;
+  static FRAME_PER_SEC = 2;
+  static FRAME_WIDTH = 25;
 
   static async cleanFrames() {
     try {
@@ -86,7 +86,6 @@ export class VideoUtils {
       );
     } catch (error) {
       console.error('Error in frame extraction:', error);
-      // Clean up on error
       await this.cleanFrames();
       errorCallback();
     }
