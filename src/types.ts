@@ -1,9 +1,9 @@
 // types/index.ts
-export interface Frame {
-  uri: string;
-  status: 'loading' | 'ready' | 'error';
-  timestamp: number;
-}
+// export interface Frame {
+//   uri: string;
+//   status: 'loading' | 'ready' | 'error';
+//   timestamp: number;
+// }
 
 export interface TrimRange {
   start: number;
@@ -43,4 +43,43 @@ export interface ScrollingTimelineProps {
   onSplitPointsChange: (points: SplitPoint[]) => void;
   onAddSplit?: () => void;
   isPlaying: boolean;
+}
+
+
+export interface Frame {
+  uri: string;
+  status?: 'ready' | 'loading' | 'error';
+  timestamp?: number;
+}
+
+export interface SegmentBounds {
+  startFrame: number;
+  endFrame: number;
+  startTime: number;
+  endTime: number;
+}
+
+export interface SegmentValidation {
+  isValid: boolean;
+  error?: string;
+  adjustedBounds?: SegmentBounds;
+}
+
+export interface VideoSegment {
+  id: string;
+  bounds: SegmentBounds;
+  frames: Frame[];
+  isSelected?: boolean;
+}
+
+export interface HandleDragEvent {
+  edge: 'left' | 'right';
+  frameIndex: number;
+  time: number;
+}
+
+export interface PreviewState {
+  isActive: boolean;
+  time: number;
+  loading: boolean;
 }

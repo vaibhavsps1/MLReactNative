@@ -21,7 +21,6 @@ import AntIcon from 'react-native-vector-icons/AntDesign';
 import {formatVideoTime, VideoUtils} from './services/VideoUtils';
 import {Frame} from './types';
 import {SplitIcon, TrashIcon} from './utils/images';
-import SegmentTimeline from './components/SegmentTimeline';
 import Toast from './utils/Toast';
 import Frame_Bar from './components/Frame_Bar';
 
@@ -175,13 +174,11 @@ const FrameTrim = () => {
           const _framesURI = Array.from({length: numberOfFrames}, (_, i) =>
             outputPath.replace('%4d', String(i + 1).padStart(4, '0')),
           );
-
           const _frames = _framesURI.map(_frameURI => ({
             uri: _frameURI,
             status: 'ready',
             timestamp: timestamp,
           }));
-
           setFrames(_frames);
           setIsGeneratingFrames(false);
         },
@@ -228,7 +225,6 @@ const FrameTrim = () => {
           setCurrentTime(newTime);
           videoRef.current?.seek(newTime);
         }
-
         if (isCropping && isPlaying) {
           setIsPlaying(false);
         }
@@ -361,7 +357,8 @@ const FrameTrim = () => {
                   transform: [{translateX: absolutePosition}],
                   height: FRAME_BAR_HEIGHT + 8,
                 },
-              ]}></View>
+              ]}
+            />
           );
         })}
       </View>

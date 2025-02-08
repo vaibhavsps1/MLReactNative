@@ -1,16 +1,18 @@
 import React from 'react';
-import {View, StyleSheet, TouchableOpacity} from 'react-native';
+import { View, StyleSheet } from 'react-native';
 
 interface BreakpointProps {
   position: number;
   barHeight: number;
   isActive?: boolean;
+  onRemove?: () => void;
 }
 
 export const BreakpointMarker: React.FC<BreakpointProps> = ({
   position,
   barHeight,
   isActive,
+  onRemove,
 }) => {
   return (
     <View
@@ -18,7 +20,7 @@ export const BreakpointMarker: React.FC<BreakpointProps> = ({
         styles.container,
         {
           height: barHeight + 20,
-          transform: [{translateX: position - 1}],
+          transform: [{ translateX: position - 1 }],
         },
         isActive && styles.active,
       ]}>
@@ -42,7 +44,7 @@ const styles = StyleSheet.create({
     borderRadius: 1,
   },
   active: {
-    transform: [{scaleX: 1.5}],
+    transform: [{ scaleX: 1.5 }],
   },
   removeButton: {
     position: 'absolute',

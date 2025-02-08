@@ -1,5 +1,5 @@
 import React from 'react';
-import {View, StyleSheet} from 'react-native';
+import { View, StyleSheet } from 'react-native';
 
 interface HandleProps {
   position: 'left' | 'right';
@@ -16,12 +16,6 @@ export const SegmentHandle: React.FC<HandleProps> = ({
   handleWidth = 16,
   barHeight = 40,
 }) => {
-  console.log(`
-    [SegmentHandle] Rendering
-    Position: ${position}
-    Active: ${isActive}
-    Has PanHandlers: ${!!panHandlers}
-  `);
   return (
     <View
       {...panHandlers}
@@ -29,10 +23,10 @@ export const SegmentHandle: React.FC<HandleProps> = ({
         styles.handle,
         position === 'left' ? styles.leftHandle : styles.rightHandle,
         isActive && styles.activeHandle,
-        {
+        { 
           width: handleWidth,
           height: barHeight,
-          zIndex: isActive ? 200 : 100,
+          zIndex: isActive ? 200 : 100 
         },
       ]}>
       <View style={styles.gripContainer}>
@@ -69,7 +63,7 @@ const styles = StyleSheet.create({
   },
   activeHandle: {
     backgroundColor: '#E1E1E1',
-    transform: [{scale: 1.1}],
+    transform: [{ scale: 1.1 }],
     shadowOpacity: 0.4,
     shadowRadius: 5,
   },

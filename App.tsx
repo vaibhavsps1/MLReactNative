@@ -5,9 +5,11 @@ import {GestureHandlerRootView} from 'react-native-gesture-handler';
 
 import VideoClip from './src/VideoClip';
 import FrameTrim from './src/FrameTrim';
+import ScrollContainer from './src/ScrollContainer';
 
 export type RootStackParamList = {
   VideoClip: undefined;
+  ScrollContainer: undefined;
   VideoTrim: {
     path: string;
     samples: number[];
@@ -30,7 +32,7 @@ function App(): JSX.Element {
     <GestureHandlerRootView style={{flex: 1}}>
       <NavigationContainer>
         <Stack.Navigator
-          initialRouteName="FrameTrim"
+          initialRouteName="ScrollContainer"
           screenOptions={{
             headerShown: false,
             animation: 'slide_from_right',
@@ -39,6 +41,13 @@ function App(): JSX.Element {
           <Stack.Screen
             name="FrameTrim"
             component={FrameTrim}
+            options={{
+              animation: 'slide_from_bottom',
+            }}
+          />
+          <Stack.Screen
+            name="ScrollContainer"
+            component={ScrollContainer}
             options={{
               animation: 'slide_from_bottom',
             }}

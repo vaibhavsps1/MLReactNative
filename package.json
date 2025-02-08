@@ -32,7 +32,8 @@
     "react-native-video": "^6.9.1",
     "react-native-video-trim": "^2.2.11",
     "react-redux": "^9.2.0",
-    "rn-range-slider": "^2.2.2"
+    "rn-range-slider": "^2.2.2",
+    "use-debounce": "^10.0.4"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
